@@ -1,0 +1,917 @@
+Attribute VB_Name = "Export"
+'---------------------------------------------------------------------------------------------
+'---------------------------------------------------------------------------------------------
+'--------------------------------References & Relevant Coments--------------------------------
+'---------------------------------------------------------------------------------------------
+'---------------------------------------------------------------------------------------------
+' Exportar Querys para el BI del Resultado Financiero
+'------------------------------------------OLEUtils-------------------------------------------
+'----------------------------------------Declarations-----------------------------------------
+#If VBA7 Then
+Declare PtrSafe Function CoRegisterMessageFilter Lib "OLE32.DLL" (ByVal lFilterIn As Long, _
+    ByRef lPreviousFilter _
+) As LongPtr
+#Else
+Declare Function CoRegisterMessageFilter Lib "OLE32.DLL" (ByVal lFilterIn As Long, _
+ByRef lPreviousFilter) As Long
+#End If
+'---------------------------------------------------------------------------------------------
+'---------------------------------------------------------------------------------------------
+'-------------------------------------------Globals-------------------------------------------
+'---------------------------------------------------------------------------------------------
+'---------------------------------------------------------------------------------------------
+Option Explicit
+Option Private Module
+'------------------------------------------OLEUtils-------------------------------------------
+'------------------------------------------Variables------------------------------------------
+Global lMsgFilter As Long
+'--------------------------------------------MAIN---------------------------------------------
+'------------------------------------------Variables------------------------------------------
+Global optionBase, optionTC, optionFBL3N, BuscarHoja As Boolean
+Global carpeta, ruta, rango, soc As String
+Global executetime As Single
+Global filas, nivel, noFormula, ultimaColumna, limite As Long
+Global mW, cW As Workbook
+Global mS, cS As Worksheet
+'---------------------------------------------------------------------------------------------
+'---------------------------------------------------------------------------------------------
+'-------------------------------------------Inputs--------------------------------------------
+'---------------------------------------------------------------------------------------------
+'---------------------------------------------------------------------------------------------
+Public Function Main_Trigger_Querys()
+    ' Pruebas
+    optionBase = True
+    'optionTC = True
+    'optionFBL3N = False
+
+    'optionBase = base
+    'optionTC = TC
+    
+    ' Fecha es aaaammdd
+    Main
+End Function
+'---------------------------------------------------------------------------------------------
+'---------------------------------------------------------------------------------------------
+'--------------------------------------------Local--------------------------------------------
+'------------------------------------------Functions------------------------------------------
+'---------------------------------------------------------------------------------------------
+'---------------------------------------------------------------------------------------------
+Private Function Main()
+    executetime = Timer
+    START_DISABLE_POP_UP_FOR_OLE
+    Set mW = ActiveWorkbook
+    Application.ScreenUpdating = False
+    
+    promptFolder
+    
+    If optionBase Then
+        Workbooks.Add.SaveAs Filename:=ruta & "\Export" ' & mW.Sheets("Base TD Pos 2").Range("A3").Value
+        Set cW = Workbooks.Open(ruta & "\Export.xlsx")
+        Set cS = mW.Sheets("ApoyoExport")
+        cS.Cells.Clear
+        proceso
+        cW.Close SaveChanges:=True
+    End If
+    'If optionTC Then
+    '    Workbooks.Add.SaveAs Filename:=ruta & "\Export TC " & mW.Sheets("Base TD Pos 2").Range("A3").Value
+    '    Set cW = Workbooks.Open(ruta & "\Export TC " & mW.Sheets("Base TD Pos 2").Range("A3").Value & ".xlsx")
+    '    Set cS = mW.Sheets("Base")
+    '    cS.Cells.Clear
+    '    procesoTC
+    '    cW.Close SaveChanges:=True
+    'End If
+    
+    END_DISABLE_POP_UP_FOR_OLE
+    executetime = Timer - executetime
+    MsgBox "Proceso terminado en " & executetime & " Segundos"
+End Function
+Private Function filasTotales()
+    filas = 2
+    Do Until cS.Range("A" & filas) = ""
+        filas = filas + 1
+    Loop
+    filas = filas - 1
+End Function
+Private Function niveles()
+    Dim j As Long
+    For j = 1 To nivel
+        cS.Range(ToColletter(ultimaColumna + j) & "1") = "Nivel " & nivel
+        cS.Range(ToColletter(ultimaColumna + j) & "2:" & ToColletter(ultimaColumna + j) & filas).FormulaLocal = "=SI.ERROR(SI.ERROR(SI(BUSCARV(VALOR($A2),DiccionarioCuentas!" & rango & "," & noFormula & ",0)=0,"""",BUSCARV(VALOR($A2),DiccionarioCuentas!" & rango & "," & noFormula & ",0)),BUSCARV($A2,DiccionarioCuentas!" & rango & "," & noFormula & ",0)),"""")"
+        nivel = nivel - 1
+        noFormula = noFormula + 1
+    Next
+End Function
+
+Private Function proceso()
+    Dim t As Long
+    Dim mes, letra As String
+    Dim fecha, fecha2 As String
+    mes = Trim(mW.Sheets("Información general").Range("C8"))
+    fecha = Trim(mW.Sheets("Fechas").Range("C7"))
+    fecha2 = Trim(mW.Sheets("Fechas").Range("C6"))
+    soc = Trim(mW.Sheets("Información general").Range("C3"))
+    '---------------------------------------------------------------------------------------'
+    '-------------------------------------- Query1 -----------------------------------------'
+    Set mS = mW.Sheets("ZIFI - Revaluación & SaldosVol")
+    Set cS = mW.Sheets("ApoyoExport")
+    cS.Cells.Clear
+    filas = 4
+    Do Until Trim(mS.Range("B" & filas)) = ""
+        filas = filas + 1
+    Loop
+    filas = filas - 1
+    cS.Activate
+    mS.Range("A3:M" & filas).Copy
+    cS.Range("A1").PasteSpecial Paste:=xlValues
+    
+    ' Limpiar formato
+    cS.Cells.ClearFormats
+    
+    ' Borrar datos con **
+    t = 2
+    Do Until cS.Range("B" & t) = ""
+        If InStr(1, Trim(cS.Range("B" & t)), "*", 1) > 0 Then
+            cS.Rows(t).Delete
+        Else
+            t = t + 1
+        End If
+    Loop
+    ' Agregar formulas
+    filasTotales
+    ultimaColumna = cS.Cells(2, cS.Columns.Count).End(xlToLeft).column
+    nivel = 5
+    noFormula = 3
+    ' =SI(BUSCARV(VALOR($A2),DiccionarioCuentas!$A:$G,3,0)=0,"",BUSCARV(VALOR($A2),DiccionarioCuentas!$A:$G,3,0))
+    '"=SI(BUSCARV(VALOR($A2),DiccionarioCuentas!$A:$G," & noFormula & ",0)=0,"""",BUSCARV(VALOR($A2),DiccionarioCuentas!$A:$G," & noFormula & ",0))"
+    rango = "$A:$G"
+    niveles
+    
+    ' Copiar info al libro export
+    For t = 1 To cW.Worksheets.Count
+        If cW.Worksheets(t).Name = "Query1" Then
+            BuscarHoja = True
+            Exit For
+        End If
+        BuscarHoja = False
+    Next
+    If BuscarHoja = False Then
+        cW.Sheets.Add(After:=cW.Sheets(cW.Sheets.Count)).Name = "Query1" 'Agregar nueva pestaña
+        
+        For t = 1 To cW.Worksheets.Count
+        If cW.Worksheets(t).Name = "Hoja1" Then
+            BuscarHoja = True
+            Exit For
+        End If
+            BuscarHoja = False
+        Next
+        If BuscarHoja = True Then
+            Application.DisplayAlerts = False
+            cW.Sheets("Hoja1").Delete
+            Application.DisplayAlerts = True
+        End If
+        
+        Set mS = cS
+        Set cS = cW.Sheets("Query1")
+        mS.Cells.Copy
+        cS.Range("A1").PasteSpecial xlPasteValues
+        
+        ' Hacer tabla "Query1"
+        cS.Activate
+        t = 2
+        Do Until cS.Range("A" & t) = ""
+            t = t + 1
+        Loop
+        t = t - 1
+        ' Fecha
+        cS.Range("S1") = "Fecha"
+        cS.Range("S2:S" & t) = fecha
+        ' Fecha2
+        cS.Range("T1") = "Fecha2"
+        cS.Range("T2:T" & t).FormulaLocal = fecha2
+        ' Mes
+        cS.Range("A:A").Insert
+        cS.Range("A1") = "Mes"
+        cS.Range("A2:A" & t) = mes
+        ' Sociedad
+        cS.Range("B:B").Insert
+        cS.Range("B1") = "Sociedad"
+        cS.Range("B2:B" & t) = Trim(soc)
+        
+        cS.Range("V2:V" & t).NumberFormat = "dd/mm/yyyy"
+        cS.Range("A1", Range("A1").End(xlToRight)).Select
+        cS.Range(Selection, Selection.End(xlDown)).Select
+        cS.ListObjects.Add(xlSrcRange, Selection, , xlYes).Name = _
+        "Query1"
+    End If
+    '---------------------------------------------------------------------------------------'
+    '------------------------------ Query 2: Z052 MG ---------------------------------------'
+    Set mS = mW.Sheets("Z052")
+    Set cS = mW.Sheets("ApoyoExport")
+    
+    cS.Cells.Clear
+    filas = 5
+    Do Until Trim(mS.Range("B" & filas)) = ""
+        filas = filas + 1
+    Loop
+    filas = filas - 1
+    cS.Activate
+    mS.Range("B4:I" & filas).Copy
+    cS.Range("A1").PasteSpecial Paste:=xlValues
+    
+    ' Limpiar formato
+    cS.Cells.ClearFormats
+    
+    ' Borrar datos con **
+    t = 2
+    Do Until cS.Range("A" & t) = ""
+        If InStr(1, Trim(cS.Range("A" & t)), "*", 1) > 0 Then
+            cS.Rows(t).Delete
+        Else
+            t = t + 1
+        End If
+    Loop
+    ' Agregar extrae
+    filas = 2
+    Do Until cS.Range("A" & filas) = ""
+        filas = filas + 1
+    Loop
+    filas = filas - 1
+    
+    cS.Range("A:A").Insert
+    cS.Range("A1") = "Extrae"
+    cS.Range("A2:A" & filas).FormulaLocal = "=EXTRAE(ESPACIOS(B2),1,10)"
+    ' Agregar formulas
+    filasTotales
+    ultimaColumna = cS.Cells(1, cS.Columns.Count).End(xlToLeft).column
+    nivel = 5
+    noFormula = 3
+    ' =SI(BUSCARV(VALOR($A2),DiccionarioCuentas!$A:$G,3,0)=0,"",BUSCARV(VALOR($A2),DiccionarioCuentas!$A:$G,3,0))
+    '"=SI(BUSCARV(VALOR($A2),DiccionarioCuentas!$A:$G," & noFormula & ",0)=0,"""",BUSCARV(VALOR($A2),DiccionarioCuentas!$A:$G," & noFormula & ",0))"
+    rango = "$A:$G"
+    niveles
+    
+    ' Copiar info al libro export
+    For t = 1 To cW.Worksheets.Count
+        If cW.Worksheets(t).Name = "Query2" Then
+            BuscarHoja = True
+            Exit For
+        End If
+        BuscarHoja = False
+    Next
+    If BuscarHoja = False Then
+        cW.Sheets.Add(After:=cW.Sheets(cW.Sheets.Count)).Name = "Query2" 'Agregar nueva pestaña
+        
+        For t = 1 To cW.Worksheets.Count
+        If cW.Worksheets(t).Name = "Hoja1" Then
+            BuscarHoja = True
+            Exit For
+        End If
+            BuscarHoja = False
+        Next
+        If BuscarHoja = True Then
+            Application.DisplayAlerts = False
+            cW.Sheets("Hoja1").Delete
+            Application.DisplayAlerts = True
+        End If
+        
+        Set mS = cS
+        Set cS = cW.Sheets("Query2")
+        mS.Cells.Copy
+        cS.Range("A1").PasteSpecial xlPasteValues
+        
+        ' Hacer tabla "Query2"
+        cS.Activate
+        t = 2
+        Do Until cS.Range("A" & t) = ""
+            t = t + 1
+        Loop
+        t = t - 1
+        ' Fecha
+        cS.Range("O1") = "Fecha"
+        cS.Range("O2:O" & t) = fecha
+        ' Fecha2
+        cS.Range("P1") = "Fecha2"
+        cS.Range("P2:P" & t).FormulaLocal = fecha2
+        ' Mes
+        cS.Range("A:A").Insert
+        cS.Range("A1") = "Mes"
+        cS.Range("A2:A" & t) = mes
+        ' Sociedad
+        cS.Range("B:B").Insert
+        cS.Range("B1") = "Sociedad"
+        cS.Range("B2:B" & t) = Trim(soc)
+        
+        ' Mes Actual & Anterior
+        cS.Range("E1") = "MesActual"
+        cS.Range("F1") = "MesAnterior"
+        
+        cS.Range("R2:R" & t).NumberFormat = "dd/mm/yyyy"
+        cS.Range("A1", Range("A1").End(xlToRight)).Select
+        cS.Range(Selection, Selection.End(xlDown)).Select
+        cS.ListObjects.Add(xlSrcRange, Selection, , xlYes).Name = _
+        "Query2"
+    End If
+    '---------------------------------------------------------------------------------------'
+    '---------------------------------- Query 3: TC ----------------------------------------'
+    cW.Sheets.Add(After:=cW.Sheets(cW.Sheets.Count)).Name = "Query3" 'Agregar nueva pestaña
+    Set mS = mW.Sheets("Base TC")
+    Set cS = cW.Sheets("Query3")
+    
+    filas = 2
+    Do Until mS.Range("A" & filas) = ""
+        filas = filas + 1
+    Loop
+    filas = filas - 1
+    mS.Range("A2:F" & filas).Copy
+    cS.Range("A1").PasteSpecial xlPasteValues
+    cS.Activate
+    filas = 2
+    Do Until cS.Range("A" & filas) = ""
+        filas = filas + 1
+    Loop
+    filas = filas - 1
+    
+    cS.Range("A:A").Insert
+    cS.Range("A1") = "Mes"
+    cS.Range("A2:A" & filas) = mes
+    cS.Range("H1") = "Fecha"
+    cS.Range("H2:H" & filas) = fecha
+    cS.Range("I1") = "Fecha2"
+    cS.Range("I2:I" & filas).Value = CDate(fecha2)
+    
+    cS.Range("A1", Range("A1").End(xlToRight)).Select
+    cS.Range(Selection, Selection.End(xlDown)).Select
+    cS.ListObjects.Add(xlSrcRange, Selection, , xlYes).Name = _
+        "Query3"
+    '---------------------------------------------------------------------------------------'
+    '-------------------------------- Query 4: ZIPL ----------------------------------------'
+    Set mS = mW.Sheets("ZIPL")
+    Set cS = mW.Sheets("ApoyoExport")
+    cS.Cells.Clear
+    filas = 4
+    Do Until Trim(mS.Range("B" & filas)) = ""
+        filas = filas + 1
+    Loop
+    filas = filas - 1
+    cS.Activate
+    mS.Range("A2:D" & filas).Copy
+    cS.Range("A1").PasteSpecial Paste:=xlValues
+    
+    ' Limpiar formato
+    cS.Cells.ClearFormats
+    
+    ' Agregar formulas
+    filasTotales
+    ultimaColumna = cS.Cells(2, cS.Columns.Count).End(xlToLeft).column
+    nivel = 2
+    noFormula = 3
+    ' BUSCARX($A3,DiccionarioCuentas!$L:$L,DiccionarioCuentas!I:I)
+    ' BUSCARX($A3,DiccionarioCuentas!$L:$L,DiccionarioCuentas!J:J)
+    ' BUSCARX($A3,DiccionarioCuentas!$L:$L,DiccionarioCuentas!K:K)
+    rango = "$I:$L"
+    niveles
+    
+    ' Borrar vacios
+    t = 2
+    Do Until t = filas
+        If cS.Range("E" & t) = "" And cS.Range("B" & t) <> "" Then
+            cS.Rows(t).Delete
+        Else
+            t = t + 1
+        End If
+    Loop
+    
+    ' Copiar info al libro export
+    For t = 1 To cW.Worksheets.Count
+        If cW.Worksheets(t).Name = "Query4" Then
+            BuscarHoja = True
+            Exit For
+        End If
+        BuscarHoja = False
+    Next
+    If BuscarHoja = False Then
+        cW.Sheets.Add(After:=cW.Sheets(cW.Sheets.Count)).Name = "Query4" 'Agregar nueva pestaña
+        For t = 1 To cW.Worksheets.Count
+        If cW.Worksheets(t).Name = "Hoja1" Then
+            BuscarHoja = True
+            Exit For
+        End If
+            BuscarHoja = False
+        Next
+        If BuscarHoja = True Then
+            Application.DisplayAlerts = False
+            cW.Sheets("Hoja1").Delete
+            Application.DisplayAlerts = True
+        End If
+        
+        Set mS = cS
+        Set cS = cW.Sheets("Query4")
+        mS.Cells.Copy
+        cS.Range("A1").PasteSpecial xlPasteValues
+        
+        ' Hacer tabla "Query4"
+        cS.Activate
+        t = 2
+        Do Until cS.Range("A" & t) = ""
+            t = t + 1
+        Loop
+        t = t - 1
+        ' Nombre A y B
+        cS.Range("A1") = "Cuenta"
+        cS.Range("B1") = "CuentaNombre"
+        ' Fecha
+        cS.Range("G1") = "Fecha"
+        cS.Range("G2:G" & t) = fecha
+        ' Fecha2
+        cS.Range("H1") = "Fecha2"
+        cS.Range("H2:H" & t).FormulaLocal = fecha2
+        ' Mes
+        cS.Range("A:A").Insert
+        cS.Range("A1") = "Mes"
+        cS.Range("A2:A" & t) = mes
+        ' Sociedad
+        cS.Range("B:B").Insert
+        cS.Range("B1") = "Sociedad"
+        cS.Range("B2:B" & t) = Trim(soc)
+        
+        cS.Range("J2:J" & t).NumberFormat = "dd/mm/yyyy"
+        cS.Range("A1", Range("A1").End(xlToRight)).Select
+        cS.Range(Selection, Selection.End(xlDown)).Select
+        cS.ListObjects.Add(xlSrcRange, Selection, , xlYes).Name = _
+        "Query4"
+    End If
+    '---------------------------------------------------------------------------------------'
+    '-------------------------------- Query 5: ZMX6 ----------------------------------------'
+    Set mS = mW.Sheets("ZMX6")
+    Set cS = mW.Sheets("ApoyoExport")
+    cS.Cells.Clear
+    filas = 5
+    Do Until Trim(mS.Range("B" & filas)) = ""
+        filas = filas + 1
+    Loop
+    filas = filas - 1
+    cS.Activate
+    mS.Range("A4:S" & filas).Copy
+    cS.Range("A1").PasteSpecial Paste:=xlValues
+    
+    ' Limpiar formato
+    cS.Cells.ClearFormats
+    
+    ' Agregar formulas
+    filasTotales
+    ultimaColumna = cS.Cells(1, cS.Columns.Count).End(xlToLeft).column
+    nivel = 2
+    noFormula = 3
+    ' BUSCARX($A3,DiccionarioCuentas!$L:$L,DiccionarioCuentas!I:I)
+    ' BUSCARX($A3,DiccionarioCuentas!$L:$L,DiccionarioCuentas!J:J)
+    ' BUSCARX($A3,DiccionarioCuentas!$L:$L,DiccionarioCuentas!K:K)
+    rango = "$I:$L"
+    cS.Activate
+    cS.Range("A1") = "Cuenta"
+    niveles
+    
+    ' Borrar vacios
+    t = 2
+    Do Until t = filas
+        If cS.Range("T" & t) = "" And cS.Range("B" & t) <> "" Then
+            cS.Rows(t).Delete
+        Else
+            t = t + 1
+        End If
+    Loop
+    cS.Activate
+    ' Copiar info al libro export
+    For t = 1 To cW.Worksheets.Count
+        If cW.Worksheets(t).Name = "Query5" Then
+            BuscarHoja = True
+            Exit For
+        End If
+        BuscarHoja = False
+    Next
+    If BuscarHoja = False Then
+        cW.Sheets.Add(After:=cW.Sheets(cW.Sheets.Count)).Name = "Query5" 'Agregar nueva pestaña
+        For t = 1 To cW.Worksheets.Count
+        If cW.Worksheets(t).Name = "Hoja1" Then
+            BuscarHoja = True
+            Exit For
+        End If
+            BuscarHoja = False
+        Next
+        If BuscarHoja = True Then
+            Application.DisplayAlerts = False
+            cW.Sheets("Hoja1").Delete
+            Application.DisplayAlerts = True
+        End If
+        
+        Set mS = cS
+        Set cS = cW.Sheets("Query5")
+        mS.Cells.Copy
+        cS.Range("A1").PasteSpecial xlPasteValues
+        
+        ' Hacer tabla "Query1"
+        cS.Activate
+        t = 2
+        Do Until cS.Range("A" & t) = ""
+            t = t + 1
+        Loop
+        t = t - 1
+        ' Nombre A
+        cS.Range("A1") = "Cuenta"
+        ' Fecha
+        cS.Range("V1") = "Fecha"
+        cS.Range("V2:V" & t) = fecha
+        ' Fecha2
+        cS.Range("W1") = "Fecha2"
+        cS.Range("W2:W" & t).FormulaLocal = fecha2
+        ' Mes
+        cS.Range("A:A").Insert
+        cS.Range("A1") = "Mes"
+        cS.Range("A2:A" & t) = mes
+        ' Sociedad
+        cS.Range("B:B").Insert
+        cS.Range("B1") = "Sociedad"
+        cS.Range("B2:B" & t) = Trim(soc)
+        
+        ' Edo Resultados Local MGpo
+        cS.Range("D1") = "Edo Resultados Local MGpo"
+        
+        cS.Range("Y2:Y" & t).NumberFormat = "dd/mm/yyyy"
+        cS.Range("A1", Range("A1").End(xlToRight)).Select
+        cS.Range(Selection, Selection.End(xlDown)).Select
+        cS.ListObjects.Add(xlSrcRange, Selection, , xlYes).Name = _
+        "Query5"
+    End If
+    '---------------------------------------------------------------------------------------'
+    '----------------------------- Query 6: Cuentas Puente ---------------------------------'
+    Set mS = mW.Sheets("Cuentas Puente")
+    Set cS = mW.Sheets("ApoyoExport")
+    cS.Cells.Clear
+    filas = 5
+    Do Until Trim(mS.Range("B" & filas)) = ""
+        filas = filas + 1
+    Loop
+    filas = filas - 1
+    cS.Activate
+    mS.Range("A4:E" & filas).Copy
+    cS.Range("A1").PasteSpecial Paste:=xlValues
+    
+    ' Limpiar formato
+    cS.Cells.ClearFormats
+    
+    ' Borrar *
+    t = 2
+    Do Until cS.Range("B" & t) = ""
+        If InStr(1, Trim(cS.Range("B" & t)), "*", 1) > 0 Then
+            cS.Rows(t).Delete
+        Else
+            t = t + 1
+        End If
+    Loop
+    
+    ' Agregar formulas
+    filasTotales
+    ultimaColumna = cS.Cells(1, cS.Columns.Count).End(xlToLeft).column
+    nivel = 2
+    noFormula = 3
+    ' BUSCARX($A3,DiccionarioCuentas!$L:$L,DiccionarioCuentas!I:I)
+    ' BUSCARX($A3,DiccionarioCuentas!$L:$L,DiccionarioCuentas!J:J)
+    ' BUSCARX($A3,DiccionarioCuentas!$L:$L,DiccionarioCuentas!K:K)
+    rango = "$N:$Q"
+    cS.Activate
+    cS.Range("A1") = "Cuenta"
+    niveles
+    
+    cS.Activate
+    ' Copiar info al libro export
+    For t = 1 To cW.Worksheets.Count
+        If cW.Worksheets(t).Name = "Query6" Then
+            BuscarHoja = True
+            Exit For
+        End If
+        BuscarHoja = False
+    Next
+    If BuscarHoja = False Then
+        cW.Sheets.Add(After:=cW.Sheets(cW.Sheets.Count)).Name = "Query6" 'Agregar nueva pestaña
+        For t = 1 To cW.Worksheets.Count
+        If cW.Worksheets(t).Name = "Hoja1" Then
+            BuscarHoja = True
+            Exit For
+        End If
+            BuscarHoja = False
+        Next
+        If BuscarHoja = True Then
+            Application.DisplayAlerts = False
+            cW.Sheets("Hoja1").Delete
+            Application.DisplayAlerts = True
+        End If
+        
+        Set mS = cS
+        Set cS = cW.Sheets("Query6")
+        mS.Cells.Copy
+        cS.Range("A1").PasteSpecial xlPasteValues
+        
+        ' Hacer tabla "Query1"
+        cS.Activate
+        t = 2
+        Do Until cS.Range("A" & t) = ""
+            t = t + 1
+        Loop
+        t = t - 1
+        ' Fecha
+        cS.Range("H1") = "Fecha"
+        cS.Range("H2:H" & t) = fecha
+        ' Fecha2
+        cS.Range("I1") = "Fecha2"
+        cS.Range("I2:I" & t).FormulaLocal = fecha2
+        ' Mes
+        cS.Range("A:A").Insert
+        cS.Range("A1") = "Mes"
+        cS.Range("A2:A" & t) = mes
+        ' Sociedad
+        cS.Range("B:B").Insert
+        cS.Range("B1") = "Sociedad"
+        cS.Range("B2:B" & t) = Trim(soc)
+        
+        ' Edo Resultados Local MGpo
+        cS.Range("D1") = "Cuenta Nombre"
+        
+        cS.Range("K2:K" & t).NumberFormat = "dd/mm/yyyy"
+        cS.Range("A1", Range("A1").End(xlToRight)).Select
+        cS.Range(Selection, Selection.End(xlDown)).Select
+        cS.ListObjects.Add(xlSrcRange, Selection, , xlYes).Name = _
+        "Query6"
+    End If
+    '---------------------------------------------------------------------------------------'
+    '---------------------------------- Query 7: ZPYL --------------------------------------'
+    Set mS = mW.Sheets("ZPYL")
+    Set cS = mW.Sheets("ApoyoExport")
+    
+    cS.Cells.Clear
+    filas = 12
+    Do Until Trim(mS.Range("A" & filas)) = "* Depreciation FA non-Commercial"
+        If filas = 10000 Then
+            Exit Do
+        End If
+        filas = filas + 1
+    Loop
+    filas = filas - 1
+    If filas <> 9999 Then
+    cS.Activate
+    mS.Range("A" & filas & ":D" & filas).Copy
+    cS.Range("A1").PasteSpecial Paste:=xlValues
+    
+    ' Limpiar formato
+    cS.Cells.ClearFormats
+    
+    cS.Rows(1).Insert
+    
+    ' Titulos
+    cS.Range("A1") = "Cuenta"
+    cS.Range("B1") = "Cuenta Nombre"
+    cS.Range("C1") = "TOTAL"
+    cS.Range("D1") = "Total TUBES"
+    
+    cS.Activate
+    ' Copiar info al libro export
+    For t = 1 To cW.Worksheets.Count
+        If cW.Worksheets(t).Name = "Query7" Then
+            BuscarHoja = True
+            Exit For
+        End If
+        BuscarHoja = False
+    Next
+    If BuscarHoja = False Then
+        cW.Sheets.Add(After:=cW.Sheets(cW.Sheets.Count)).Name = "Query7" 'Agregar nueva pestaña
+        For t = 1 To cW.Worksheets.Count
+        If cW.Worksheets(t).Name = "Hoja1" Then
+            BuscarHoja = True
+            Exit For
+        End If
+            BuscarHoja = False
+        Next
+        If BuscarHoja = True Then
+            Application.DisplayAlerts = False
+            cW.Sheets("Hoja1").Delete
+            Application.DisplayAlerts = True
+        End If
+        
+        Set mS = cS
+        Set cS = cW.Sheets("Query7")
+        mS.Cells.Copy
+        cS.Range("A1").PasteSpecial xlPasteValues
+        
+        ' Hacer tabla "Query7"
+        cS.Activate
+        t = 2
+        Do Until cS.Range("A" & t) = ""
+            t = t + 1
+        Loop
+        t = t - 1
+        ' Fecha
+        cS.Range("E1") = "Fecha"
+        cS.Range("E2:E" & t) = fecha
+        ' Fecha2
+        cS.Range("F1") = "Fecha2"
+        cS.Range("F2:F" & t).FormulaLocal = fecha2
+        ' Mes
+        cS.Range("A:A").Insert
+        cS.Range("A1") = "Mes"
+        cS.Range("A2:A" & t) = mes
+        ' Sociedad
+        cS.Range("B:B").Insert
+        cS.Range("B1") = "Sociedad"
+        cS.Range("B2:B" & t) = Trim(soc)
+        
+        cS.Range("H2:H" & t).NumberFormat = "dd/mm/yyyy"
+        cS.Range("A1", Range("A1").End(xlToRight)).Select
+        cS.Range(Selection, Selection.End(xlDown)).Select
+        cS.ListObjects.Add(xlSrcRange, Selection, , xlYes).Name = _
+        "Query7"
+    End If
+    Else
+        cW.Sheets.Add(After:=cW.Sheets(cW.Sheets.Count)).Name = "Query7" 'Agregar nueva pestaña
+        Set mS = cS
+        Set cS = cW.Sheets("Query7")
+        ' Titulos
+        cS.Range("A1") = "Cuenta"
+        cS.Range("B1") = "Cuenta Nombre"
+        cS.Range("C1") = "TOTAL"
+        cS.Range("D1") = "Total TUBES"
+        ' Fecha
+        cS.Range("E1") = "Fecha"
+        ' Fecha2
+        cS.Range("F1") = "Fecha2"
+        ' Mes
+        cS.Range("A:A").Insert
+        cS.Range("A1") = "Mes"
+        ' Sociedad
+        cS.Range("B:B").Insert
+        cS.Range("B1") = "Sociedad"
+        cS.Range("A1").Select
+        cS.Range("A1", Range("A1").End(xlToRight)).Select
+        cS.ListObjects.Add(xlSrcRange, Selection, , xlYes).Name = _
+        "Query7"
+    End If
+End Function
+Private Function procesoTC()
+    Dim t As Long
+    ' Generar las tablas
+    Set mS = mW.Sheets("DATOS")
+    Set cS = mW.Sheets("Base")
+    
+    ' TC Cierre Mes Anterior y Mes Actual
+    mS.Range("B2:D16").Copy
+    cS.Range("B2").PasteSpecial xlPasteValues
+    
+    ' TC DIARIO MES ACTUAL USD
+    mS.Range("B19:H53").Copy
+    cS.Range("F2").PasteSpecial xlPasteValues
+    
+    ' EURO
+    mS.Range("B55:R89").Copy
+    cS.Range("N2").PasteSpecial xlPasteValues
+    
+    ' Limpiar formato
+    cS.Cells.ClearFormats
+    
+    ' Copiar info al libro export
+    For t = 1 To cW.Worksheets.Count
+        If cW.Worksheets(t).Name = "Query1" Then
+            BuscarHoja = True
+            Exit For
+        End If
+        BuscarHoja = False
+    Next
+    If BuscarHoja = False Then
+        cW.Sheets.Add(After:=cW.Sheets(cW.Sheets.Count)).Name = "Query1" 'Agregar nueva pestaña
+        
+        For t = 1 To cW.Worksheets.Count
+        If cW.Worksheets(t).Name = "Hoja1" Then
+            BuscarHoja = True
+            Exit For
+        End If
+            BuscarHoja = False
+        Next
+        If BuscarHoja = True Then
+            Application.DisplayAlerts = False
+                cW.Sheets("Hoja1").Delete
+            Application.DisplayAlerts = True
+        End If
+        
+        Set mS = cS
+        Set cS = cW.Sheets("Query1")
+        mS.Cells.Copy cS.Range("A1")
+        
+    Else
+        'cW.Sheets("Query1").Rows(2).Delete
+        'cW.Sheets("Query1").Rows(5).Delete
+    End If
+End Function
+Private Function procesoFBL3N()
+    Dim t As Long
+    ' Generar las tablas
+    Set mS = mW.Sheets("Posición MXN")
+    Set cS = mW.Sheets("Base")
+    
+    filas = 11
+    Do Until Trim(mS.Range("A" & filas)) = "Total general"
+        filas = filas + 1
+    Loop
+    filas = filas - 1
+    
+    ' Primera tabla de MXN (SumaMXN)
+    mS.Range("A11:B" & filas).Copy
+    cS.Range("C1").PasteSpecial Paste:=xlPasteAll, Operation:=xlNone, SkipBlanks:= _
+        False, Transpose:=True
+    
+    ' Segunda tabla de MXN (PosMXN)
+    cS.Rows(1).Copy cS.Range("A4")
+    mS.Range("C11:C" & filas).Copy
+    cS.Range("C5").PasteSpecial Paste:=xlPasteAll, Operation:=xlNone, SkipBlanks:= _
+        False, Transpose:=True
+    
+    cS.Range("A1").Value = "Fecha"
+    cS.Range("B1").Value = "Mes"
+    cS.Range("A2").Value = CStr(Format(Now, "YYYYMMDD"))
+    cS.Range("B2").Value = mW.Sheets("Posición MXN").Range("B10").Value
+    
+    cS.Range("A1:B2").Copy cS.Range("A4")
+    
+    ' Limpiar formato
+    cS.Cells.ClearFormats
+    
+    ' Copiar info al libro export
+    For t = 1 To cW.Worksheets.Count
+        If cW.Worksheets(t).Name = "Query1" Then
+            BuscarHoja = True
+            Exit For
+        End If
+        BuscarHoja = False
+    Next
+    If BuscarHoja = False Then
+        cW.Sheets.Add(After:=cW.Sheets(cW.Sheets.Count)).Name = "Query1" 'Agregar nueva pestaña
+        
+        For t = 1 To cW.Worksheets.Count
+        If cW.Worksheets(t).Name = "Hoja1" Then
+            BuscarHoja = True
+            Exit For
+        End If
+            BuscarHoja = False
+        Next
+        If BuscarHoja = True Then
+            Application.DisplayAlerts = False
+                cW.Sheets("Hoja1").Delete
+            Application.DisplayAlerts = True
+        End If
+        
+        Set mS = cS
+        Set cS = cW.Sheets("Query1")
+        mS.Cells.Copy cS.Range("A1")
+        
+        ' Hacer tabla "SumaMXN"
+        cS.Range("A1", Range("A1").End(xlToRight)).Select
+        cS.Range(Selection, Selection.End(xlDown)).Select
+        cS.ListObjects.Add(xlSrcRange, Selection, , xlYes).Name = _
+        "SumaMXN"
+        
+        ' Hacer tabla "PosMXN"
+        cS.Range("A4", Range("A4").End(xlToRight)).Select
+        cS.Range(Selection, Selection.End(xlDown)).Select
+        cS.ListObjects.Add(xlSrcRange, Selection, , xlYes).Name = _
+        "PosMXN"
+        
+    Else
+        cW.Sheets("Query1").Rows(2).Delete
+        cW.Sheets("Query1").Rows(5).Delete
+    End If
+End Function
+'---------------------------------------------------------------------------------------------
+'---------------------------------------------------------------------------------------------
+'------------------------------------------OLEUtils-------------------------------------------
+'------------------------------------------Functions------------------------------------------
+'---------------------------------------------------------------------------------------------
+'---------------------------------------------------------------------------------------------
+Private Function START_DISABLE_POP_UP_FOR_OLE()
+    CoRegisterMessageFilter 0&, lMsgFilter
+End Function
+Private Function END_DISABLE_POP_UP_FOR_OLE()
+    CoRegisterMessageFilter lMsgFilter, lMsgFilter
+End Function
+'---------------------------------------------------------------------------------------------
+'---------------------------------------------------------------------------------------------
+'------------------------------------------External-------------------------------------------
+'------------------------------------------Functions------------------------------------------
+'---------------------------------------------------------------------------------------------
+'---------------------------------------------------------------------------------------------
+Public Function promptFolder()
+    With Application.FileDialog(msoFileDialogFolderPicker)
+        .Show
+        carpeta = .SelectedItems(1)
+    End With
+    ruta = CStr(carpeta)
+End Function
+'------------------------- Función para convertir números a letras ----------------------------'
+Private Function ToColletter(Collet)
+    ToColletter = Split(Cells(1, Collet).Address, "$")(1)
+End Function
+

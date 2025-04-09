@@ -1,0 +1,2417 @@
+Attribute VB_Name = "Macro_ControlCierre"
+Option Explicit
+'----------------------------------------WindowsAPIUtils--------------------------------------
+'-----------------------------------------Declarations----------------------------------------
+'Libreria utilizada: Winuser.h
+Private Const WM_CLOSE = &H10
+Private Const WM_QUIT = &H12
+Private Const WM_DESTROY = &H2
+Private Const WM_NCDESTROY = &H82
+Private Const WM_SETTEXT = &HC
+Private Const WM_KEYDOWN = &H100
+Private Const BM_CLICK = &HF5
+Private Const PROCESS_TERMINATE = &H1
+
+#If VBA7 Then
+    Private parentHandler As LongPtr
+    Private hWndChild As LongPtr
+    Private hWnd As LongPtr
+#Else
+    Private parentHandler As Long
+    Private hWndChild As Long
+    Private hWnd As Long
+#End If
+
+Private lpClassName As String
+Private position As Long
+Private i As Long
+Private regex As Object
+
+Declare PtrSafe Function FindWindow2 Lib "user32" Alias "FindWindowA" (ByVal lpClassName _
+As String, ByVal lpWindowName As String) As LongPtr
+
+#If VBA7 Then
+    Private Declare PtrSafe Function FindWindow Lib "user32" Alias "FindWindowA" ( _
+    ByVal lpClassName As String, ByVal lpWindowName As String) As LongPtr
+#Else
+    Private Declare Function FindWindow Lib "user32" Alias "FindWindowA" ( _
+    ByVal lpClassName As String, ByVal lpWindowName As String) As Long
+#End If
+
+#If VBA7 Then
+    Private Declare PtrSafe Function FindWindowEx Lib "user32" Alias "FindWindowExA" ( _
+    ByVal hWndParent As LongPtr, ByVal hWndChildAfter As LongPtr, ByVal lpszClass _
+    As String, ByVal lpszWindow As String) As LongPtr
+#Else
+    Private Declare Function FindWindowEx Lib "user32" Alias "FindWindowExA" ( _
+    ByVal hWndParent As Long, ByVal hWndChildAfter As Long, ByVal lpszClass As String, _
+    ByVal lpszWindow As String) As Long
+#End If
+
+#If VBA7 Then
+    Private Declare PtrSafe Function PostMessage Lib "user32" Alias "PostMessageA" ( _
+    ByVal hWnd As LongPtr, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam _
+    As Any) As Long
+#Else
+    Private Declare Function PostMessage Lib "user32" Alias "PostMessageA" (ByVal _
+    hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Any) As Long
+#End If
+
+
+Declare PtrSafe Function SendMessage2 Lib "user32" Alias "SendMessageA" (ByVal hWnd _
+As LongPtr, ByVal wMsg As Long, ByVal wParam As LongPtr, lParam As Any) As LongPtr
+
+#If VBA7 Then
+    Private Declare PtrSafe Function SendMessage Lib "user32" Alias "SendMessageA" ( _
+    ByVal hWnd As LongPtr, ByVal msg As Long, ByVal wParam As Long, ByVal lParam As Any) _
+    As Long
+#Else
+    Private Declare Function SendMessage Lib "user32" Alias "SendMessageA" (ByVal _
+    hWnd As Long, ByVal msg As Long, ByVal wParam As Long,ByVal lParam As Any) As Long
+#End If
+
+#If VBA7 Then
+    Private Declare PtrSafe Function GetWindowText Lib "user32" Alias "GetWindowTextA" _
+    (ByVal hWnd As LongPtr, ByVal lpString As String, ByVal nMaxCount As Long) As Long
+#Else
+    Private Declare Function GetWindowText Lib "user32" Alias "GetWindowTextA" (ByVal _
+    hWnd As Long, ByVal lpString As String, ByVal nMaxCount As Long) As Long
+#End If
+
+#If VBA7 Then
+    Private Declare PtrSafe Function GetWindowTextLength Lib "user32" Alias _
+    "GetWindowTextLengthA" (ByVal hWnd As LongPtr) As Long
+#Else
+    Private Declare Function GetWindowTextLength Lib "user32" Alias "GetWindowTextLengthA" _
+    (ByVal hWnd As Long) As Long
+#End If
+
+#If VBA7 Then
+    Private Declare PtrSafe Function EnumWindows Lib "user32" (ByVal lpEnumFunc As LongPtr, _
+    ByVal lParam As Long) As LongPtr
+#Else
+    Private Declare Function EnumWindows Lib "user32" (ByVal lpEnumFunc As Long, ByVal lParam _
+    As Long) As Long
+#End If
+
+#If VBA7 Then
+    Private Declare PtrSafe Function EnumChildWindows Lib "user32" (ByVal hWndParent _
+    As LongPtr, ByVal lpEnumFunc As LongPtr, ByVal lParam As LongPtr) As LongPtr
+#Else
+    Private Declare Function EnumChildWindows Lib "user32" (ByVal hWndParent As Long, ByVal _
+    lpEnumFunc As Long, ByVal lParam As Long) As Long
+#End If
+
+#If VBA7 Then
+    Private Declare PtrSafe Function IsWindowVisible Lib "user32" (ByVal hWnd As LongPtr) _
+    As LongPtr
+#Else
+    Private Declare Function IsWindowVisible Lib "user32" (ByVal hWnd As Long) As Long
+#End If
+
+#If VBA7 Then
+    Private Declare PtrSafe Function GetClassName Lib "user32" Alias "GetClassNameA" ( _
+    ByVal hWnd As LongPtr, ByVal lpClassName As String, ByVal nMaxCount As Long) As Long
+#Else
+    Private Declare Function GetClassName Lib "user32" Alias "GetClassNameA" (ByVal _
+    hWnd As Long, ByVal lpClassName As String, ByVal nMaxCount As Long) As Long
+#End If
+
+#If VBA7 Then
+    Private Declare PtrSafe Function GetParent Lib "user32" (ByVal hWnd As LongPtr) As LongPtr
+#Else
+    Private Declare Function GetParent Lib "user32" (ByVal hWnd As Long) As Long
+#End If
+
+#If VBA7 Then
+    Private Declare PtrSafe Function GetWindowThreadProcessId Lib "user32" (ByVal hWnd As _
+    LongPtr, ByRef lpdwProcessId As Long) As Long
+#Else
+    Private Declare Function GetWindowThreadProcessId Lib "user32" (ByVal hWnd As Long, _
+    ByRef lpdwProcessId As Long) As Long
+#End If
+
+#If VBA7 Then
+    Private Declare PtrSafe Function OpenProcess Lib "kernel32" (ByVal dwDesiredAccessas _
+    As Long, ByVal bInheritHandle As Long, ByVal dwProcId As Long) As LongPtr
+#Else
+    Private Declare Function OpenProcess Lib "kernel32" (ByVal dwDesiredAccessas As Long, _
+    ByVal bInheritHandle As Long, ByVal dwProcId As Long) As Long
+#End If
+
+#If VBA7 Then
+    Private Declare PtrSafe Function OpenThread Lib "kernel32" (ByVal dwDesiredAccess _
+    As Long, ByVal bInheritHandle As Long, ByVal dwThreadId As Long) As LongPtr
+#Else
+    Private Declare Function OpenThread Lib "kernel32" (ByVal dwDesiredAccess As Long, _
+    ByVal bInheritHandle As Long, ByVal dwThreadId As Long) As Long
+#End If
+
+#If VBA7 Then
+    Private Declare PtrSafe Function TerminateProcess Lib "kernel32" (ByVal hProcess _
+    As LongPtr, ByVal uExitCode As Long) As Long
+#Else
+    Private Declare Function TerminateProcess Lib "kernel32" (ByVal hProcess As Long, _
+    ByVal uExitCode As Long) As Long
+#End If
+
+#If VBA7 Then
+    Private Declare PtrSafe Function TerminateThread Lib "kernel32" (ByVal hThread _
+    As LongPtr, ByVal dwExitCode As Long) As Long
+#Else
+    Private Declare Function TerminateThread Lib "kernel32" (ByVal hThread As Long, _
+    ByVal dwExitCode As Long) As Long
+#End If
+
+#If VBA7 Then
+    Private Declare PtrSafe Function CloseHandle Lib "kernel32" (ByVal hObject As LongPtr) _
+    As Long
+#Else
+    Private Declare Function CloseHandle Lib "kernel32" (ByVal hObject As Long) As Long
+#End If
+
+'Libreria utilizada: Microsoft Scripting Runtime
+'La libreria puede ser agregada desde el menu 'Herramientas' - 'Referencias' - 'Microsoft Scripting Runtime'
+'Documentacion oficial del objeto utilizado, proporcionado por la libreria:
+'https://docs.microsoft.com/en-us/office/vba/language/reference/user-interface-help/dictionary-object
+
+'@Overview DictionaryUtils proporciona funciones que facilitan la manipulacion del objeto Dictionary,
+'permitiendo agregar, eliminar, recuperar y verificar existencia de elementos agregados al objeto.
+'Ademas, permite convertir una hoja de excel que representa un diccionario de datos para clasificar informacion a un
+'objeto Dictionary, lo cual mejora la eficiencia al buscar informacion.
+    Global dictionary As New dictionary
+'Declaración de las variables de 'ReportDownloader'
+    Global sourceWorkbook As Workbook
+    Global targetWorkbook As Workbook
+    Global targetReport As String
+'@Overview OLEUtils proporciona funciones que permiten desabilitar el mensaje emergente:
+'"Microsoft Excel is waiting for another application to complete an OLE action"
+'el mensaje anterior sale cuando una aplicacion externa tarda en dar respuesta, lo cual provoca que la ejecucion de la macro
+'se detenga, y el usuario tenga que cerrar la ventana emergente para continuar la ejecucion de la macro.
+'para evitar este problema, debe usar las 2 funciones proporcionadas para desabilitar el mensaje emergente y asi evitar que la
+'ejecucion de la macro se detenga. El codigo debe estar encerrado entre las 2 funciones proporcionadas, ejemplo:
+'START_DISABLE_POP_UP_FOR_OLE
+'tu codigo aqui
+'END_DISABLE_POP_UP_FOR_OLE
+    #If VBA7 Then
+    Declare PtrSafe Function CoRegisterMessageFilter Lib "OLE32.DLL" ( _
+        ByVal lFilterIn As Long, _
+        ByRef lPreviousFilter _
+    ) As LongPtr
+    #Else
+    Declare Function CoRegisterMessageFilter Lib "OLE32.DLL" ( _
+        ByVal lFilterIn As Long, _
+        ByRef lPreviousFilter _
+    ) As Long
+    #End If
+    Global lMsgFilter As Long
+'Libreria utilizada: SAP GUI Scripting API
+'La libreria puede ser agregada desde el menu 'Herramientas' - 'Referencias' - 'SAP GUI Scripting API'.
+'Por defecto la libreria no aparece, debe ser agregada mediante el archivo OCX, para ello pulsar el boton "Examinar"
+'y abrir la siguiente ruta: C:\Program Files (x86)\SAP\FrontEnd\SAPgui\
+'dentro de la ruta seleccione el archivo sapfewse.ocx
+'Documentacion oficial: https://help.sap.com/viewer/b47d018c3b9b45e897faf66a6c0885a8/760.03/en-US
+'@Overview SAPGUIScriptingAPIUtils proporciona funciones que facilitan la conexion con la aplicacion SAP Logon,
+'creacion de nuevos modos, aplicacion de transacciones, y verificacion de la existencia de componentes gui
+'durante la ejecucion de un Script en SAP Logon.
+    Global sapGuiAuto As Object
+    Global sapApplication As GuiApplication
+    Global sapConnection As GuiConnection
+    Global Session As GuiSession
+'Variables Main
+    Global officeIntegration As guiOfficeIntegration
+    Global macroSheet As Worksheet
+    Global reference, columnRange, rowRange As Range
+    Global row, column As Long
+    Global perFin4, perFin3, perFin2, perFin1, perIni1, perIni2, perIni3, perIni4 As String
+    Global marcado, group, society, fiscalYear1, fiscalYear2, periodTo, periodFrom, ejer1, ejer2, ejer3, ejer4, accountNumber, _
+           takeSheetsFormat, keepPreviousReport, ML As String
+    Global executetime As Single
+    Global targetReportName, user, password As String
+    Global controlSheet, copySheet, pasteSheet, apoyoSheet As Worksheet
+    Global y, col, pastei, copyi As Long
+    Global callsVar As Boolean
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''Formulas'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    Const ZIFI_TEEC_CONTROL_TC As String = "=IF(E3=0,0,E3-TC!$B$6)"
+    Const ZIFI_TEEC_TIPO As String = "=IF(MID(B3,10,1)=""1"",""Activo"",IF(MID(B3,10,1)=""2"",""Pasivo"",""""))"
+    Const ZIFI_TEEC_SALDO_VOLTEADO_USD As String = "=IF(B3=IFERROR(VLOOKUP(B3,Diccionario2!A:A,1,0),""""),""OK"",IF(AND(G3=""Activo"",C3<0),""Revisar"",IF(AND(G3=""Pasivo"",C3>0),""Revisar"",""OK"")))"
+    Const ZIFI_TEEC_SALDO_VOLTEADO_MXN As String = "=IF(B3=IFERROR(VLOOKUP(B3,Diccionario2!A:A,1,0),""""),""OK"",IF(AND(G3=""Activo"",D3<0),""Revisar"",IF(AND(G3=""Pasivo"",D3>0),""Revisar"",""OK"")))"
+Private Function inicializacion()
+    executetime = Timer
+    START_DISABLE_POP_UP_FOR_OLE
+    
+    Application.ScreenUpdating = False
+    Application.DisplayAlerts = False
+  
+    Set Session = GetConnection
+    Set Session = OpenTransactionInNewModo("GR55")
+        
+    'leyendo que reportes descargar
+    Set macroSheet = ThisWorkbook.Worksheets("Macro")
+        
+    Set reference = macroSheet.Range("description")
+    'column = 1
+    Set controlSheet = ThisWorkbook.Worksheets("Información general")
+    society = controlSheet.Range("C3").Value
+    ' Inicializacion de variables
+    fiscalYear2 = ""
+    fiscalYear1 = ""
+    periodTo = ""
+    periodFrom = ""
+    accountNumber = ""
+    takeSheetsFormat = ""
+    keepPreviousReport = ""
+    perFin4 = ""
+    perIni4 = ""
+    perFin3 = ""
+    perIni3 = ""
+    perFin2 = ""
+    perIni2 = ""
+    perFin1 = ""
+    perIni1 = ""
+    ejer1 = ""
+    ejer2 = ""
+    ejer3 = ""
+    ejer4 = ""
+    subsis
+        
+End Function
+Sub Main()
+    inicializacion
+    ' Recorrido de descarga de los reportes
+    If controlSheet.Range("F4") = "x" Then
+        group = "ZIFI"
+        grupo
+        OpenTransaction "/nGR55"
+        RunSAPScript group
+    End If
+    If controlSheet.Range("G4") = "x" Then
+        group = "CUENTAS PUENTE"
+        grupo
+        OpenTransaction "/nGR55"
+        RunSAPScript group
+    End If
+    If controlSheet.Range("H4") = "x" Then
+        group = "ZIPL"
+        grupo
+        OpenTransaction "/nGR55"
+        RunSAPScript group
+    End If
+    If controlSheet.Range("K4") = "x" Then
+        group = "ZPYL"
+        grupo
+        OpenTransaction "/nGR55"
+        RunSAPScript group
+    End If
+    If controlSheet.Range("M4") = "x" Then
+        group = "ZM44"
+        grupo
+        OpenTransaction "/nGR55"
+        RunSAPScript group
+        If society = "TEVI" Then
+            group = "ZM44_2"
+            ML = "EUR"
+            grupo
+            OpenTransaction "/nGR55"
+            RunSAPScript group
+        End If
+    End If
+    If controlSheet.Range("L4") = "x" Then
+        group = "ZGES"
+        grupo
+        OpenTransaction "/nGR55"
+        RunSAPScript group
+        Worksheets("ZGES " & society).Move before:=Worksheets("ZM44")
+    End If
+    If controlSheet.Range("I4") = "x" Then
+        group = "Z052"
+        grupo
+        OpenTransaction "/nGR55"
+        RunSAPScript group
+    End If
+    If controlSheet.Range("G6") = "x" Then
+        group = "ZMX1"
+        grupo
+        OpenTransaction "/nGR55"
+        RunSAPScript group
+    End If
+    If controlSheet.Range("J4") = "x" Then
+        group = "ZMX6"
+        grupo
+        OpenTransaction "/nGR55"
+        RunSAPScript group
+    End If
+    If controlSheet.Range("I6") = "x" Then
+        group = "ZL10"
+        grupo
+        OpenTransaction "/nGR55"
+        RunSAPScript group
+    End If
+    If controlSheet.Range("J6") = "x" Then
+        group = "ZF05"
+        grupo
+        OpenTransaction "/nGR55"
+        RunSAPScript group
+    End If
+    
+    If society = "SEGE" Then
+        If controlSheet.Range("K6") = "x" Then
+            group = "ZM15"
+            grupo
+            OpenTransaction "/nGR55"
+            RunSAPScript group
+            Worksheets("ZM15 " & society).Move before:=Worksheets("ZM44")
+            ThisWorkbook.Sheets("ZM15 " & society).Tab.Color = RGB(0, 32, 96)
+        
+            group = "ZM15_2"
+            grupo
+            OpenTransaction "/nGR55"
+            RunSAPScript group
+            Worksheets("ZM15 " & society & " ACUMULADO").Move before:=Worksheets("ZM44")
+            ThisWorkbook.Sheets("ZM15 " & society & " ACUMULADO").Tab.Color = RGB(0, 32, 96)
+            
+            controlSheet.Range("K6").Value = "OK"
+        End If
+    End If
+            
+    'restableciendo el tipo de salida de integración office, se establece con el formato de salida de SAP
+    Session.FindById("wnd[0]").sendVKey 48
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = ""
+    Session.FindById("wnd[0]").sendVKey 0
+        
+    'cerrando la ventana activa de SAP en la cual trabajó el Script
+    CloseCurrentModo
+    
+    ' Proceso de acomodo
+    
+    If controlSheet.Range("F4") = "x" Then
+        revaluacion
+        'saldos_volteados
+        ThisWorkbook.Sheets("ZIFI " & society).Delete
+        controlSheet.Range("F4").Value = "OK"
+    End If
+    If controlSheet.Range("G4") = "x" Then
+        cuentas_puente_acomodo
+        ThisWorkbook.Sheets("CUENTAS PUENTE " & society).Delete
+        controlSheet.Range("G4").Value = "OK"
+    End If
+    If controlSheet.Range("H4") = "x" Then
+        zipl_acomodo
+        ThisWorkbook.Sheets("ZIPL " & society).Delete
+        controlSheet.Range("H4").Value = "OK"
+    End If
+    If controlSheet.Range("K4") = "x" Then
+        zpyl_acomodo
+        ThisWorkbook.Sheets("ZPYL " & society).Delete
+        controlSheet.Range("K4").Value = "OK"
+    End If
+    If controlSheet.Range("L4") = "x" Then
+        zm44_acomodo
+        ThisWorkbook.Sheets("ZM44 " & society).Delete
+        If society = "TEVI" Then
+            ThisWorkbook.Sheets("ZM44 EUR " & society).Delete
+        End If
+        controlSheet.Range("J4").Value = "OK"
+    End If
+    If controlSheet.Range("M4") = "x" Then
+        zges_acomodo
+        ThisWorkbook.Sheets("ZGES " & society).Delete
+        controlSheet.Range("K4").Value = "OK"
+    End If
+    If controlSheet.Range("I4") = "x" Then
+        z052_acomodo
+        ThisWorkbook.Sheets("Z052 " & society & " ZIFI_I").Delete
+        controlSheet.Range("I4").Value = "OK"
+    End If
+    If controlSheet.Range("G6") = "x" Then
+        zmx1_acomodo
+        ThisWorkbook.Sheets("ZMX1 " & society).Delete
+        controlSheet.Range("G6").Value = "OK"
+    End If
+    If controlSheet.Range("J4") = "x" Then
+        zmx6_acomodo
+        ThisWorkbook.Sheets("ZMX6 " & society).Delete
+        controlSheet.Range("J4").Value = "OK"
+    End If
+    If controlSheet.Range("I6") = "x" Then
+        zl10_acomodo
+        ThisWorkbook.Sheets("ZL10 " & society).Delete
+        controlSheet.Range("I6").Value = "OK"
+    End If
+    If controlSheet.Range("J6") = "x" Then
+        zf05_acomodo
+        ThisWorkbook.Sheets("ZF05 " & society).Delete
+        controlSheet.Range("J6").Value = "OK"
+    End If
+       
+    Tablero_ControlesAdicionales
+    
+    'If society = "TEVI" Then
+    '    ThisWorkbook.Sheets("ZM44 EUR").Visible = True
+    'Else
+    '    ThisWorkbook.Sheets("ZM44 EUR").Visible = False
+    'End If
+    ' Actualizar filtro checklist
+    'ThisWorkbook.Sheets("Checklist").Activate
+    'ThisWorkbook.Sheets("Checklist").PivotTables("Checklist").PivotFields("Sociedad").CurrentPage = society
+    
+    finalizacion
+    
+End Sub
+Private Function finalizacion()
+    ThisWorkbook.Worksheets("Información general").Select
+    END_DISABLE_POP_UP_FOR_OLE
+    
+    executetime = Timer - executetime
+    
+    MsgBox "Reportes Descargados en " & executetime & " Segundos"
+End Function
+Private Function zl10_acomodo()
+    Set copySheet = ThisWorkbook.Sheets("ZL10 " & society)
+    Set pasteSheet = ThisWorkbook.Sheets("ZL10")
+    
+    pasteSheet.Cells.Delete
+    pasteSheet.Cells.Delete
+    
+    copySheet.Cells.Copy pasteSheet.Range("A1")
+End Function
+Private Function zf05_acomodo()
+    Set copySheet = ThisWorkbook.Sheets("ZF05 " & society)
+    Set pasteSheet = ThisWorkbook.Sheets("ZF05")
+    
+    pasteSheet.Cells.Delete
+    pasteSheet.Cells.Delete
+    
+    copySheet.Cells.Copy pasteSheet.Range("A1")
+End Function
+Private Function Tablero_ControlesAdicionales()
+    Dim valor As String
+    ' Copiando los controles adicionales
+    Set copySheet = ThisWorkbook.Sheets("Controles Base")
+    Set pasteSheet = ThisWorkbook.Sheets("Controles adicionales")
+    
+    pasteSheet.Cells.Delete
+    pasteSheet.Cells.Delete
+    
+    copySheet.Cells.Copy pasteSheet.Range("A1")
+    
+    ' Copiando el tablero
+    Set copySheet = ThisWorkbook.Sheets("Tablero Base")
+    Set pasteSheet = ThisWorkbook.Sheets("Tablero")
+    
+'FORMULAS CONTROL CUADRE DE REPORTES
+    ' Fórmula Z052 USD
+    valor = "=" & copySheet.Range("D6").Value
+    pasteSheet.Range("D6").FormulaLocal = valor
+    ' Fórmula Z052 MXN
+    valor = "=" & copySheet.Range("E6").Value
+    pasteSheet.Range("E6").FormulaLocal = valor
+    
+    ' Fórmula ZPYL USD
+    'valor = "=" & copySheet.Range("D7").Value
+    'pasteSheet.Range("D7").FormulaLocal = valor
+    
+    ' Fórmula ZMX1 USD
+    'valor = "=" & copySheet.Range("D8").Value
+    'pasteSheet.Range("D8").FormulaLocal = valor
+    ' Fórmula ZMX1 MXN
+    'valor = "=" & copySheet.Range("E8").Value
+    'pasteSheet.Range("E8").FormulaLocal = valor
+    
+    ' Fórmula ZGES USD
+    'valor = "=" & copySheet.Range("D9").Value
+    'pasteSheet.Range("D9").FormulaLocal = valor
+    ' Fórmula ZGES MXN
+    'valor = "=" & copySheet.Range("E9").Value
+    'pasteSheet.Range("E9").FormulaLocal = valor
+    
+' FORMULAS CONTROLES ADICIONALES
+    ' Depreciación IFRS/Gestional USD
+    valor = "='" & copySheet.Range("D13").Value
+    pasteSheet.Range("D13").FormulaLocal = valor
+    
+    ' Cuentas puente con saldo Conteo
+    valor = "=" & copySheet.Range("C14").Value
+    pasteSheet.Range("C14").FormulaLocal = valor
+    valor = "='" & copySheet.Range("D14").Value
+    pasteSheet.Range("D14").FormulaLocal = valor
+    ' Cuentas puente con saldo MXN
+    valor = "='" & copySheet.Range("E14").Value
+    pasteSheet.Range("E14").FormulaLocal = valor
+    
+    ' Movimientos relevantes Z052 Conteo
+    valor = "='" & copySheet.Range("C15").Value
+    pasteSheet.Range("C15").FormulaLocal = valor
+    ' Movimientos relevantes Z052 USD
+    valor = "='" & copySheet.Range("D15").Value
+    pasteSheet.Range("D15").FormulaLocal = valor
+    
+    ' Cuentas locales con saldo USD
+    'valor = "=" & copySheet.Range("D19").Value
+    'pasteSheet.Range("D19").FormulaLocal = valor
+    ' Cuentas locales con saldo MXN
+    'valor = "=" & copySheet.Range("E19").Value
+    'pasteSheet.Range("E19").FormulaLocal = valor
+    
+    ' Movimientos relevantes ZMX6 Conteo
+    valor = "=" & copySheet.Range("C16").Value
+    pasteSheet.Range("C16").FormulaLocal = valor
+    ' Movimientos relevantes ZMX6 USD
+    valor = "=" & copySheet.Range("D16").Value
+    pasteSheet.Range("D16").FormulaLocal = valor
+    
+    ' Prueba FX USD
+    'valor = "='" & copySheet.Range("D21").Value
+    'pasteSheet.Range("D21").FormulaLocal = valor
+    ' Prueba FX MXN
+    'valor = "='" & copySheet.Range("E21").Value
+    'pasteSheet.Range("E21").FormulaLocal = valor
+    
+    ' Reclasificación de impuesto Conteo
+    valor = "=" & copySheet.Range("C17").Value
+    pasteSheet.Range("C17").FormulaLocal = valor
+    
+    pasteSheet.Activate
+    pasteSheet.Cells.Select
+    pasteSheet.Cells.EntireColumn.AutoFit
+    
+End Function
+Private Function zges_acomodo()
+    Set copySheet = ThisWorkbook.Sheets("ZGES " & society)
+    Set pasteSheet = ThisWorkbook.Sheets("ZGES")
+    
+    pasteSheet.Cells.Delete
+    pasteSheet.Cells.Delete
+    
+    copySheet.Cells.Copy pasteSheet.Range("A1")
+    
+End Function
+Private Function diccionario_formulas()
+    Dim valor, fechaMes As String
+    Set copySheet = ThisWorkbook.Sheets("Diccionario")
+    Set pasteSheet = ThisWorkbook.Sheets("ZMX6 Base")
+    
+    fechaMes = ThisWorkbook.Sheets("Información general").Range("C7")
+    
+    Select Case fechaMes
+        Case "1"
+            ' Copiar y Pegar Acumulado USD
+            valor = "=" & copySheet.Range("AL12").Value
+            pasteSheet.Range("O5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Diferencia USD
+            valor = "=" & copySheet.Range("AL8").Value
+            pasteSheet.Range("Q5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Acumulado MXN
+            valor = "=" & copySheet.Range("AL16").Value
+            pasteSheet.Range("AH5").FormulaLocal = valor
+        Case "2"
+            ' Copiar y Pegar Acumulado USD
+            valor = "=" & copySheet.Range("AM12").Value
+            pasteSheet.Range("O5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Diferencia USD
+            valor = "=" & copySheet.Range("AM8").Value
+            pasteSheet.Range("Q5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Acumulado MXN
+            valor = "=" & copySheet.Range("AM16").Value
+            pasteSheet.Range("AH5").FormulaLocal = valor
+        Case "3"
+            ' Copiar y Pegar Acumulado USD
+            valor = "=" & copySheet.Range("AN12").Value
+            pasteSheet.Range("O5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Diferencia USD
+            valor = "=" & copySheet.Range("AN8").Value
+            pasteSheet.Range("Q5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Acumulado MXN
+            valor = "=" & copySheet.Range("AN16").Value
+            pasteSheet.Range("AH5").FormulaLocal = valor
+        Case "4"
+            ' Copiar y Pegar Acumulado USD
+            valor = "=" & copySheet.Range("AO12").Value
+            pasteSheet.Range("O5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Diferencia USD
+            valor = "=" & copySheet.Range("AO8").Value
+            pasteSheet.Range("Q5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Acumulado MXN
+            valor = "=" & copySheet.Range("AO16").Value
+            pasteSheet.Range("AH5").FormulaLocal = valor
+        Case "5"
+            ' Copiar y Pegar Acumulado USD
+            valor = "=" & copySheet.Range("AP12").Value
+            pasteSheet.Range("O5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Diferencia USD
+            valor = "=" & copySheet.Range("AP8").Value
+            pasteSheet.Range("Q5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Acumulado MXN
+            valor = "=" & copySheet.Range("AP16").Value
+            pasteSheet.Range("AH5").FormulaLocal = valor
+        Case "6"
+            ' Copiar y Pegar Acumulado USD
+            valor = "=" & copySheet.Range("AQ12").Value
+            pasteSheet.Range("O5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Diferencia USD
+            valor = "=" & copySheet.Range("AQ8").Value
+            pasteSheet.Range("Q5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Acumulado MXN
+            valor = "=" & copySheet.Range("AQ16").Value
+            pasteSheet.Range("AH5").FormulaLocal = valor
+        Case "7"
+            ' Copiar y Pegar Acumulado USD
+            valor = "=" & copySheet.Range("AR12").Value
+            pasteSheet.Range("O5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Diferencia USD
+            valor = "=" & copySheet.Range("AR8").Value
+            pasteSheet.Range("Q5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Acumulado MXN
+            valor = "=" & copySheet.Range("AR16").Value
+            pasteSheet.Range("AH5").FormulaLocal = valor
+        Case "8"
+            ' Copiar y Pegar Acumulado USD
+            valor = "=" & copySheet.Range("AS12").Value
+            pasteSheet.Range("O5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Diferencia USD
+            valor = "=" & copySheet.Range("AS8").Value
+            pasteSheet.Range("Q5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Acumulado MXN
+            valor = "=" & copySheet.Range("AS16").Value
+            pasteSheet.Range("AH5").FormulaLocal = valor
+        Case "9"
+            ' Copiar y Pegar Acumulado USD
+            valor = "=" & copySheet.Range("AT12").Value
+            pasteSheet.Range("O5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Diferencia USD
+            valor = "=" & copySheet.Range("AT8").Value
+            pasteSheet.Range("Q5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Acumulado MXN
+            valor = "=" & copySheet.Range("AT16").Value
+            pasteSheet.Range("AH5").FormulaLocal = valor
+        Case "10"
+            ' Copiar y Pegar Acumulado USD
+            valor = "=" & copySheet.Range("AU12").Value
+            pasteSheet.Range("O5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Diferencia USD
+            valor = "=" & copySheet.Range("AU8").Value
+            pasteSheet.Range("Q5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Acumulado MXN
+            valor = "=" & copySheet.Range("AU16").Value
+            pasteSheet.Range("AH5").FormulaLocal = valor
+        Case "11"
+            ' Copiar y Pegar Acumulado USD
+            valor = "=" & copySheet.Range("AV12").Value
+            pasteSheet.Range("O5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Diferencia USD
+            valor = "=" & copySheet.Range("AV8").Value
+            pasteSheet.Range("Q5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Acumulado MXN
+            valor = "=" & copySheet.Range("AV16").Value
+            pasteSheet.Range("AH5").FormulaLocal = valor
+        Case "12"
+            ' Copiar y Pegar Acumulado USD
+            valor = "=" & copySheet.Range("AW12").Value
+            pasteSheet.Range("O5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Diferencia USD
+            valor = "=" & copySheet.Range("AW8").Value
+            pasteSheet.Range("Q5").FormulaLocal = valor
+            
+            ' Copiar y Pegar Acumulado MXN
+            valor = "=" & copySheet.Range("AW16").Value
+            pasteSheet.Range("AH5").FormulaLocal = valor
+    End Select
+End Function
+Private Function zmx6_acomodo()
+    Dim fechaMes As String
+    
+    diccionario_formulas
+    Set copySheet = ThisWorkbook.Sheets("ZMX6 " & society)
+    Set pasteSheet = ThisWorkbook.Sheets("ZMX6")
+    Set apoyoSheet = ThisWorkbook.Sheets("ZMX6 Base")
+    
+    fechaMes = ThisWorkbook.Sheets("Información general").Range("C6")
+    
+    copySheet.Outline.ShowLevels RowLevels:=8
+    
+    ' Acomo de la hoja a pegar ZMX6
+    pasteSheet.Cells.Clear
+    pasteSheet.Cells.Clear
+    
+    copySheet.Cells.Copy pasteSheet.Range("A1")
+    
+    ' Estructurar la hoja con lo pegado
+    pasteSheet.Rows("1:2").Insert
+    pasteSheet.Columns("S:T").Insert
+    pasteSheet.Columns("AI").Delete
+    
+    apoyoSheet.Rows(1).Copy pasteSheet.Range("A1")
+    apoyoSheet.Range("O4:S4").Copy pasteSheet.Range("O4:S4")
+    y = 5
+    col = 2
+    tamañoPaste
+    apoyoSheet.Range("A5").Copy pasteSheet.Range("A5:A" & y)
+    If fechaMes = "1" Then
+        apoyoSheet.Range("AJ5").Copy pasteSheet.Range("AJ5:AJ" & y)
+    End If
+    apoyoSheet.Range("O5:R5").Copy pasteSheet.Range("O5:R" & y)
+    apoyoSheet.Range("AH4").Copy pasteSheet.Range("AH4")
+    apoyoSheet.Range("AH5").Copy pasteSheet.Range("AH5:AH" & y)
+    
+    pasteSheet.Range("B4:S4").AutoFilter
+    
+End Function
+Private Function zm44_acomodo()
+    Dim filas As Long
+    Set copySheet = ThisWorkbook.Sheets("ZM44 " & society)
+    Set pasteSheet = ThisWorkbook.Sheets("ZM44")
+    Set apoyoSheet = ThisWorkbook.Sheets("ZM44 Base")
+    
+    copySheet.Outline.ShowLevels RowLevels:=8
+    
+    pasteSheet.Cells.Delete
+    pasteSheet.Cells.Delete
+    
+    copySheet.Cells.Copy pasteSheet.Range("A1")
+    
+    pasteSheet.Rows("1:2").Insert
+    
+    apoyoSheet.Rows(1).Copy pasteSheet.Range("A1")
+    
+    filas = pasteSheet.Cells(Rows.Count, 2).End(xlUp).row
+    apoyoSheet.Range("A5").Copy pasteSheet.Range("A5:A" & filas)
+    
+    ' Formulas de los meses
+    apoyoSheet.Range("I4:K5").Copy pasteSheet.Range("I4")
+    pasteSheet.Range("I5:K5").Copy pasteSheet.Range("I6:K" & filas)
+    
+    ' Copiar y pegar control
+    apoyoSheet.Range("M4:S25").Copy pasteSheet.Range("M4")
+    
+    If society = "SCOL" Then
+        apoyoSheet.Range("AQ4:AZ25").Copy pasteSheet.Range("M4")
+    End If
+    If society = "TEPE" Then
+        apoyoSheet.Range("BB4:BK25").Copy pasteSheet.Range("M4")
+    End If
+    If society = "TGUY" Then
+        apoyoSheet.Range("BM4:BV25").Copy pasteSheet.Range("M4")
+    End If
+    
+    ' Control TEVI
+    If society = "TEVI" Then
+        apoyoSheet.Range("U4:AD25").Copy pasteSheet.Range("M4")
+        ' Se copiaran datos para la hoja "ZM44 EUR"
+        Set copySheet = ThisWorkbook.Sheets("ZM44 EUR " & society)
+        Set pasteSheet = ThisWorkbook.Sheets("ZM44 EUR")
+        Set apoyoSheet = ThisWorkbook.Sheets("ZM44 Base")
+        copySheet.Outline.ShowLevels RowLevels:=8
+    
+        pasteSheet.Cells.Delete
+        pasteSheet.Cells.Delete
+    
+        copySheet.Cells.Copy pasteSheet.Range("A1")
+    
+        pasteSheet.Rows("1:2").Insert
+        apoyoSheet.Rows(1).Copy pasteSheet.Range("A1")
+        filas = pasteSheet.Cells(Rows.Count, 2).End(xlUp).row
+        apoyoSheet.Range("A5").Copy pasteSheet.Range("A5:A" & filas)
+        ' Formulas de los meses
+        apoyoSheet.Range("I4:K5").Copy pasteSheet.Range("I4")
+        pasteSheet.Range("I5:K5").Copy pasteSheet.Range("I6:K" & filas)
+        ' Copiar y pegar control
+        apoyoSheet.Range("AF4:AO25").Copy pasteSheet.Range("M4")
+        
+    End If
+    
+    
+    
+    
+End Function
+Private Function zmx1_acomodo()
+    Set copySheet = ThisWorkbook.Sheets("ZMX1 " & society)
+    Set pasteSheet = ThisWorkbook.Sheets("ZMX1")
+    Set apoyoSheet = ThisWorkbook.Sheets("ZMX1 Base")
+    
+    copySheet.Outline.ShowLevels RowLevels:=8
+    
+    pasteSheet.Cells.Delete
+    pasteSheet.Cells.Delete
+    
+    copySheet.Cells.Copy pasteSheet.Range("A1")
+    
+    y = 3
+    col = 2
+    tamañoPaste
+    
+    pasteSheet.Range("A" & (y + 1) & ":" & "E" & (y + 50000)).Delete
+    
+    pasteSheet.Rows("1:2").Insert
+    
+    pasteSheet.Columns("B:E").Insert
+    apoyoSheet.Range("A4:E4").Copy pasteSheet.Range("A4")
+    
+    apoyoSheet.Rows(1).Copy pasteSheet.Range("A1")
+    
+    y = 5
+    col = 6
+    tamañoPaste
+    apoyoSheet.Range("A3:E3").Copy pasteSheet.Range("A5:E" & y)
+    
+    pasteSheet.Columns("B:E").Hidden = True
+    pasteSheet.Range("A4:I4").AutoFilter
+    
+    pasteSheet.Range("A4:I" & y).AutoFilter Field:=1, _
+        Criteria1:="Balance Local"
+    
+End Function
+Private Function zpyl_acomodo()
+    Dim filas As Long
+    Set copySheet = ThisWorkbook.Sheets("ZPYL " & society)
+    Set pasteSheet = ThisWorkbook.Sheets("ZPYL")
+    Set apoyoSheet = ThisWorkbook.Sheets("ZPYL Base")
+    
+    copySheet.Cells.Copy pasteSheet.Range("A1")
+    
+    ' Acomodar hoja
+    pasteSheet.Rows("1:10").Insert
+    pasteSheet.Rows(11).Delete
+    
+    apoyoSheet.Range("B2:D9").Copy pasteSheet.Range("B2")
+    filas = pasteSheet.Cells(Rows.Count, 2).End(xlUp).row
+    apoyoSheet.Range("A12").Copy pasteSheet.Range("A12:A" & filas)
+    
+End Function
+Private Function z052_acomodo()
+    Set copySheet = ThisWorkbook.Sheets("Z052 " & society & " " & accountNumber)
+    Set pasteSheet = ThisWorkbook.Sheets("Z052")
+    Set apoyoSheet = ThisWorkbook.Sheets("Z052 Base")
+    
+    copySheet.Outline.ShowLevels RowLevels:=8
+    
+    pasteSheet.Cells.Delete
+    copySheet.Cells.Copy pasteSheet.Range("A1")
+    
+    ' Acomodar hoja
+    pasteSheet.Rows(1).Insert
+    pasteSheet.Rows(1).Insert
+    apoyoSheet.Rows(1).Copy pasteSheet.Range("A1")
+    apoyoSheet.Range("G4:I4").Copy pasteSheet.Range("G4:I4")
+    y = 5
+    col = 2
+    tamañoPaste
+    apoyoSheet.Visible = True
+    apoyoSheet.Range("G3:I3").Copy pasteSheet.Range("G5:I" & y)
+    apoyoSheet.Visible = False
+    pasteSheet.Range("B4:I4").AutoFilter
+End Function
+Private Function zipl_acomodo()
+    Dim filas As Long
+    Set copySheet = ThisWorkbook.Sheets("ZIPL " & society)
+    Set pasteSheet = ThisWorkbook.Sheets("ZIPL")
+    'copySheet.Activate
+    copySheet.Cells.Copy pasteSheet.Range("A1")
+    pasteSheet.Range("A3").FormulaLocal = "=SI.ERROR(VALOR(ESPACIOS(EXTRAE(ESPACIOS(B3),1,10))),ESPACIOS(EXTRAE(ESPACIOS(B3),ENCONTRAR("" "",ESPACIOS(B3)),LARGO(ESPACIOS(B3))-ENCONTRAR("" "",ESPACIOS(B3))+1)))"
+    filas = pasteSheet.Cells(Rows.Count, 2).End(xlUp).row
+    
+    pasteSheet.Range("A3").Copy pasteSheet.Range("A4:A" & filas)
+End Function
+Private Function cuentas_puente_acomodo()
+    Dim filas As Long
+    Set copySheet = ThisWorkbook.Sheets("CUENTAS PUENTE " & society)
+    Set pasteSheet = ThisWorkbook.Sheets("Cuentas Puente")
+    Set apoyoSheet = ThisWorkbook.Sheets("Cuentas Puente Base")
+    
+    copySheet.Outline.ShowLevels RowLevels:=8
+    copySheet.Cells.Copy pasteSheet.Range("A1")
+    
+    ' Acomodar hoja
+    pasteSheet.Rows(1).Insert
+    pasteSheet.Rows(1).Insert
+    
+    filas = 5
+    Do Until pasteSheet.Range("B" & filas) = ""
+        filas = filas + 1
+    Loop
+    filas = filas - 1
+    
+    pasteSheet.Range("A5").FormulaLocal = "=SI.ERROR(VALOR(EXTRAE(ESPACIOS(B5),1,10)),"""")"
+    pasteSheet.Range("A5").Copy pasteSheet.Range("A5:A" & filas)
+    
+    apoyoSheet.Rows(1).Copy pasteSheet.Range("A1")
+    pasteSheet.Outline.ShowLevels RowLevels:=1
+    
+    
+End Function
+Private Function saldos_volteados()
+    Set copySheet = ThisWorkbook.Sheets("ZIFI " & society)
+    Set pasteSheet = ThisWorkbook.Sheets("ZIFI - Saldos Volteados")
+    Set apoyoSheet = ThisWorkbook.Sheets("Diccionario")
+    
+    ' Reacomodando la hoja
+    If pasteSheet.FilterMode Then
+        pasteSheet.ShowAllData
+    End If
+    y = 4
+    col = 2
+    tamañoPaste
+    pasteSheet.Range("B4:E" & y).Interior.Color = xlNone
+    
+    Application.Calculation = xlCalculationManual
+    pasteSheet.Range("A4:W" & y).ClearContents
+    
+    
+    ' Copiamos y pegamos ZIFI
+    copySheet.Outline.ShowLevels RowLevels:=8
+    y = 3
+    col = 2
+    tamañoCopy
+    Application.Calculation = xlCalculationAutomatic
+    copySheet.Range("B3:E" & y).Copy pasteSheet.Range("B4")
+    
+    ' Formulas
+    y = 4
+    col = 2
+    tamañoPaste
+    pasteSheet.Range("A2").Copy pasteSheet.Range("A4:A" & y)
+    pasteSheet.Range("F2:M2").Copy pasteSheet.Range("F4:M" & y)
+    
+    ' Colorear grupos de cuentas
+    Application.Calculation = xlCalculationManual
+    pastei = 4
+    Do Until pasteSheet.Cells(pastei, 1) = ""
+        copyi = 6
+        Do Until apoyoSheet.Cells(copyi, 52) = ""
+            If Trim(pasteSheet.Cells(pastei, 1).Value) = Trim(apoyoSheet.Cells(copyi, 52).Value) Then
+                apoyoSheet.Cells(copyi, 52).Copy
+                pasteSheet.Range("B" & pastei & ":" & "E" & pastei).PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
+                SkipBlanks:=False, Transpose:=False
+            End If
+        copyi = copyi + 1
+        Loop
+    pastei = pastei + 1
+    Loop
+    Application.Calculation = xlCalculationAutomatic
+    
+    
+    ' Filtrar solo "Revisar"
+    Application.Calculation = xlCalculationManual
+    pasteSheet.Range("A3:W" & y).AutoFilter Field:=11, _
+        Criteria1:="Revisar"
+    Application.Calculation = xlCalculationAutomatic
+    
+    copySheet.Range("B1").Copy pasteSheet.Range("B1")
+End Function
+Private Function revaluacion()
+    Set copySheet = ThisWorkbook.Sheets("ZIFI " & society)
+    Set pasteSheet = ThisWorkbook.Sheets("ZIFI - Revaluación & SaldosVol")
+    Set apoyoSheet = ThisWorkbook.Sheets("Diccionario")
+    
+    ' Reacomodando la hoja
+    If pasteSheet.FilterMode Then
+        pasteSheet.ShowAllData
+    End If
+    y = 4
+    col = 2
+    tamañoPaste
+    pasteSheet.Range("B4:E" & y).Interior.Color = xlNone
+    
+    Application.Calculation = xlCalculationManual
+    pasteSheet.Range("A4:M" & y).Clear
+    
+    ' Copiamos y pegamos ZIFI
+    copySheet.Outline.ShowLevels RowLevels:=8
+    y = 3
+    col = 2
+    tamañoCopy
+    Application.Calculation = xlCalculationAutomatic
+    copySheet.Range("B3:E" & y).Copy pasteSheet.Range("B4")
+    
+    ' Formulas
+    y = 4
+    col = 2
+    tamañoPaste
+    
+    ' Extrae
+    pasteSheet.Range("A2").Copy pasteSheet.Range("A4:A" & y)
+    ' Otras formulas
+    pasteSheet.Range("F2:M2").Copy pasteSheet.Range("F4:M" & y)
+    
+    ' Colorear grupos de cuentas
+    Application.Calculation = xlCalculationManual
+    pastei = 4
+    Do Until pasteSheet.Cells(pastei, 1) = ""
+        copyi = 6
+        Do Until apoyoSheet.Cells(copyi, 52) = ""
+            If Trim(pasteSheet.Cells(pastei, 1).Value) = Trim(apoyoSheet.Cells(copyi, 52).Value) Then
+                apoyoSheet.Cells(copyi, 52).Copy
+                pasteSheet.Range("B" & pastei & ":" & "E" & pastei).PasteSpecial Paste:=xlPasteFormats, Operation:=xlNone, _
+                SkipBlanks:=False, Transpose:=False
+            End If
+        copyi = copyi + 1
+        Loop
+    pastei = pastei + 1
+    Loop
+    Application.Calculation = xlCalculationAutomatic
+    ' Filtrar sin "OK" y "Vacías"
+    Application.Calculation = xlCalculationManual
+    pasteSheet.Range("A3:M" & y).AutoFilter Field:=13, _
+         Criteria1:="Revisar" ', _
+         'Operator:=xlAnd, _
+         'Criteria2:="<>OK"
+    Application.Calculation = xlCalculationAutomatic
+    
+    copySheet.Range("B1").Copy pasteSheet.Range("B1")
+End Function
+Private Function tamañoApoyo()
+    Do Until apoyoSheet.Cells(y, col) = ""
+        y = y + 1
+    Loop
+    y = y - 1
+End Function
+Private Function tamañoCopy()
+    Do Until copySheet.Cells(y, col) = ""
+        y = y + 1
+    Loop
+    y = y - 1
+End Function
+Private Function tamañoPaste()
+    Do Until pasteSheet.Cells(y, col) = ""
+        y = y + 1
+    Loop
+    y = y - 1
+End Function
+Private Function subsis()
+    Select Case society
+        Case "TAMS", "TMAC", "SEGE", "TAGN", "TESM", "TTSA", "EXMX", "RIGA", "TMDM"
+            ML = "MXN"
+        Case "TUCA", "SCOL"
+            ML = "COP"
+        Case "TEVI"
+            ML = "VES"
+        Case "TEPE"
+            ML = "PEN"
+        Case "TEEC", "TECU"
+            ML = "USD"
+        Case "TGUY"
+            ML = "GYD"
+    End Select
+End Function
+Private Function grupo()
+    Select Case group
+        Case "Z052"
+            fiscalYear2 = macroSheet.Range("F20").Value
+            fiscalYear1 = macroSheet.Range("F19").Value
+            periodTo = macroSheet.Range("F18").Value
+            periodFrom = macroSheet.Range("F17").Value
+            accountNumber = macroSheet.Range("F16").Value
+            takeSheetsFormat = ""
+            keepPreviousReport = ""
+        Case "ZIPL"
+            fiscalYear1 = macroSheet.Range("G19").Value
+            periodTo = macroSheet.Range("G18").Value
+            periodFrom = macroSheet.Range("G17").Value
+            takeSheetsFormat = ""
+            keepPreviousReport = ""
+        Case "ZIFI"
+            fiscalYear1 = macroSheet.Range("H19").Value
+            periodTo = macroSheet.Range("H18").Value
+            periodFrom = macroSheet.Range("H17").Value
+            takeSheetsFormat = ""
+            keepPreviousReport = ""
+        Case "ZPYL"
+            fiscalYear1 = macroSheet.Range("J19").Value
+            periodTo = macroSheet.Range("J18").Value
+            periodFrom = macroSheet.Range("J17").Value
+            takeSheetsFormat = ""
+            keepPreviousReport = ""
+        Case "ZMX1"
+            fiscalYear1 = macroSheet.Range("K19").Value
+            periodTo = macroSheet.Range("K18").Value
+            periodFrom = macroSheet.Range("K17").Value
+            takeSheetsFormat = ""
+            keepPreviousReport = ""
+        Case "ZMX6"
+            fiscalYear1 = macroSheet.Range("S19").Value
+            takeSheetsFormat = ""
+            keepPreviousReport = ""
+        Case "ZM44"
+            fiscalYear2 = macroSheet.Range("T20").Value
+            fiscalYear1 = macroSheet.Range("T19").Value
+            periodTo = macroSheet.Range("T18").Value
+            periodFrom = macroSheet.Range("T17").Value
+            takeSheetsFormat = ""
+            keepPreviousReport = ""
+        Case "ZM15"
+            fiscalYear1 = macroSheet.Range("V19").Value
+            periodTo = macroSheet.Range("V18").Value
+            periodFrom = macroSheet.Range("V17").Value
+            takeSheetsFormat = ""
+            keepPreviousReport = ""
+        Case "ZM15_2"
+            fiscalYear1 = macroSheet.Range("V19").Value
+            periodTo = macroSheet.Range("V18").Value
+            periodFrom = "0"
+            takeSheetsFormat = ""
+            keepPreviousReport = ""
+        Case "ZM17"
+            fiscalYear1 = macroSheet.Range("W19").Value
+            periodTo = macroSheet.Range("W18").Value
+            keepPreviousReport = ""
+            takeSheetsFormat = ""
+        Case "ZM18"
+            fiscalYear1 = macroSheet.Range("X19").Value
+            periodTo = macroSheet.Range("X18").Value
+            keepPreviousReport = ""
+            takeSheetsFormat = ""
+        Case "CUENTAS PUENTE"
+            fiscalYear1 = macroSheet.Range("U19").Value
+            periodTo = macroSheet.Range("U18").Value
+            periodFrom = macroSheet.Range("U17").Value
+            keepPreviousReport = ""
+            takeSheetsFormat = ""
+        Case "ZL10"
+            fiscalYear1 = macroSheet.Range("E19").Value
+            periodTo = macroSheet.Range("E18").Value
+            periodFrom = macroSheet.Range("E17").Value
+            keepPreviousReport = ""
+            takeSheetsFormat = ""
+        Case "ZF05"
+            fiscalYear1 = macroSheet.Range("Y19").Value
+            periodTo = macroSheet.Range("Y18").Value
+            periodFrom = macroSheet.Range("Y17").Value
+            keepPreviousReport = ""
+            takeSheetsFormat = ""
+        Case "ZGES"
+            fiscalYear1 = macroSheet.Range("I19").Value
+            periodTo = macroSheet.Range("I18").Value
+            periodFrom = macroSheet.Range("I17").Value
+            keepPreviousReport = ""
+            takeSheetsFormat = ""
+    End Select
+End Function
+Sub RunSAPScript(ByVal group As String)
+    Select Case group
+        Case "Z052"
+            Z052
+        Case "ZIPL"
+            ZIPL
+        Case "ZIFI"
+            ZIFI
+        Case "ZPYL"
+            ZPYL
+        Case "ZMX1"
+            ZMX1
+        Case "ZMX6"
+            ZMX6
+            'If CStr(ActiveWorkbook.Sheets("Información general").Range("C6")) = "1" Then
+            '    OpenTransaction "/nGR55"
+            '    ZMX6_año
+            'End If
+        Case "ZM44"
+            ZM44
+        Case "ZM44_2"
+            ZM44
+        Case "ZM15"
+            ZM15
+        Case "ZM15_2"
+            ZM15_2
+        Case "ZM17"
+            ZM17
+        Case "ZM18"
+            ZM18
+        Case "CUENTAS PUENTE"
+            CUENTAS_PUENTE
+        Case "ZGES"
+            ZGES
+        Case "ZL10"
+            ZL10
+        Case "ZF05"
+            ZF05
+    End Select
+End Sub
+'Funciones:
+Sub GetWorkbookFromSAP()
+    'recuperando workbook de excel generado por SAP
+    Set officeIntegration = Session.FindById("wnd[0]/usr/cntlCONTAINER/shellcont/shell")
+    Set sourceWorkbook = officeIntegration.Document
+    'Ejemplo de formato de nombre de hojas: group = ZL43 ZIFI + society = TAMS => targetReport = ZL43 ZIFI TAMS
+    targetReportName = group & " " & society
+    Select Case group
+        Case "ZM37", "ZM39", "ZM42", "ZM43"
+            targetReportName = group
+        Case "Z052", "ZL43"
+            targetReportName = group & " " & society & " " & accountNumber
+        Case "ZM15_2"
+            targetReportName = "ZM15" & " " & society & " ACUMULADO"
+        Case "ZMX6_año"
+            targetReportName = "ZMX6 " & society
+        Case "ZM44_2"
+            targetReportName = "ZM44 EUR" & " " & society
+    End Select
+    
+    Set sourceWorkbook = sourceWorkbook
+    Set targetWorkbook = ThisWorkbook
+    targetReport = targetReportName
+    takeSheetsFormat = takeSheetsFormat
+    keepPreviousReport = keepPreviousReport
+    
+    Download
+End Sub
+Sub ZM18()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/usr/txt$ZEJER3").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/txt$ZPERHAS").text = periodTo
+    Session.FindById("wnd[0]").sendVKey 7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 8
+    Select Case society
+        Case "TEPE"
+            takeSheetsFormat = "2"
+        Case "TECU"
+            takeSheetsFormat = "3"
+        Case "TEEC"
+            takeSheetsFormat = "4"
+        Case "TEVI"
+            takeSheetsFormat = "5"
+        Case "SCOL"
+            takeSheetsFormat = "6"
+        Case "TGUY"
+            takeSheetsFormat = "7"
+        End Select
+    GetWorkbookFromSAP
+End Sub
+Sub ZM17()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/usr/txt$ZEJER3").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/txt$ZPERHAS").text = periodTo
+    Session.FindById("wnd[0]").sendVKey 7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 8
+    Select Case society
+        Case "TEPE"
+            takeSheetsFormat = "2"
+        Case "TECU"
+            takeSheetsFormat = "3"
+        Case "TEEC"
+            takeSheetsFormat = "4"
+        Case "TEVI"
+            takeSheetsFormat = "5"
+        Case "SCOL"
+            takeSheetsFormat = "6"
+        Case "TGUY"
+            takeSheetsFormat = "7"
+        End Select
+    GetWorkbookFromSAP
+End Sub
+Sub ZM15()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/usr/txt$ZYL0").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/ctxt$ZSOCIE1").text = society
+    Session.FindById("wnd[0]/usr/ctxt$ZSOCIE2").text = society
+    Session.FindById("wnd[0]/usr/txt$ZML0").text = periodFrom
+    Session.FindById("wnd[0]/usr/txt$ZMLF").text = periodTo
+    Session.FindById("wnd[0]").sendVKey 7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 26
+    Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[0,0]").Selected = False
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 8
+    GetWorkbookFromSAP
+End Sub
+Sub ZM15_2()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = "ZM15"
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/usr/txt$ZYL0").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/ctxt$ZSOCIE1").text = society
+    Session.FindById("wnd[0]/usr/ctxt$ZSOCIE2").text = society
+    Session.FindById("wnd[0]/usr/txt$ZML0").text = "0"
+    Session.FindById("wnd[0]/usr/txt$ZMLF").text = periodTo
+    Session.FindById("wnd[0]").sendVKey 7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 26
+    Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[0,0]").Selected = False
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 8
+    group = "ZM15_2"
+    GetWorkbookFromSAP
+End Sub
+Sub Z052()
+    Dim accountNumberDescription As String
+    Dim dictionaryAccounts As Worksheet
+    Dim item() As Variant
+    
+    accountNumber = UCase(accountNumber)
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/usr/txt$A2").text = fiscalYear2
+    Session.FindById("wnd[0]/usr/txt$A1").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/txt$P1").text = periodFrom
+    Session.FindById("wnd[0]/usr/txt$P2").text = periodTo
+    Session.FindById("wnd[0]/usr/ctxt_ZSOCIE3-LOW").text = society
+    Session.FindById("wnd[0]/usr/ctxt$ZSAKNR").text = accountNumber
+    Session.FindById("wnd[0]").sendVKey 0
+    
+    If ContainsGuiComponent("wnd[1]") Then
+        Set dictionaryAccounts = ThisWorkbook.Worksheets("Diccionario Cuentas")
+        CreateFilterDictionary dictionaryAccounts
+        If Contains(accountNumber) Then
+            item = GetItem(accountNumber)
+            accountNumberDescription = Application.WorksheetFunction.Trim(item(UBound(item)))
+        End If
+    
+        'seleccionando entradas encontradas ("Patrimonial Gestional", "BALANCE MEXGAAP")
+        Session.FindById("wnd[1]").sendVKey 17
+        Session.FindById("wnd[1]/usr/tabsG_SELONETABSTRIP/tabpTAB001/ssubSUBSCR_PRESEL:SAPLSDH4:0220/sub:SAPLSDH4:0220/txtG_SELFLD_TAB-LOW[1,24]").text = accountNumberDescription
+        Session.FindById("wnd[1]").sendVKey 0
+        Session.FindById("wnd[1]/usr/lbl[26,3]").SetFocus
+        Session.FindById("wnd[1]").sendVKey 0
+    End If
+    
+    'Desmarcando una casilla de informes, para solo bajar los reportes de ML y MG
+    Session.FindById("wnd[0]").sendVKey 26
+    Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[2,0]").Selected = False
+    Session.FindById("wnd[1]").sendVKey 0
+    
+    Session.FindById("wnd[0]").sendVKey 7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0
+    
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]").sendVKey 3
+    
+    If ContainsGuiComponent("wnd[1]/usr/btnBUTTON_YES") Then
+        Session.FindById("wnd[1]/usr/btnBUTTON_YES").Press
+    End If
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/shellcont/shell/shellcont[0]/shell").SelectedNode = "000002" 'seleccionando reporte de MG
+    GetWorkbookFromSAP
+    Session.FindById("wnd[0]").sendVKey 3
+    If ContainsGuiComponent("wnd[1]/usr/btnBUTTON_YES") Then
+        Session.FindById("wnd[1]/usr/btnBUTTON_YES").Press
+    End If
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/shellcont/shell/shellcont[0]/shell").SelectedNode = "000001" 'seleccionando reporte de ML
+    keepPreviousReport = "x"
+    GetWorkbookFromSAP
+End Sub
+Sub ZGES()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/usr/txt$ZEJER3").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/txt$ZPERDES").text = periodFrom
+    Session.FindById("wnd[0]/usr/txt$ZPERHAS").text = periodTo
+    Session.FindById("wnd[0]/usr/ctxt_ZBUKRSS-LOW").text = society
+    Session.FindById("wnd[0]").sendVKey 26
+    Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[1,0]").Selected = False
+    Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[2,0]").Selected = False
+    Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[3,0]").Selected = False
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 8
+    GetWorkbookFromSAP
+End Sub
+Sub ZF05()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/usr/txt$ZEJER3").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/txt$ZPERHAS").text = periodTo
+    Session.FindById("wnd[0]/usr/ctxt_ZBUKRSS-LOW").text = society
+    'session.FindById("wnd[0]/usr/ctxt_ZBUKRSS-LOW").SetFocus
+    'session.FindById("wnd[0]/usr/ctxt_ZBUKRSS-LOW").CaretPosition = 4
+    Session.FindById("wnd[0]").sendVKey 7       ' F7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").SetFocus
+    Session.FindById("wnd[1]").sendVKey 0       ' Enter
+    Session.FindById("wnd[0]").sendVKey 8       ' F8
+    GetWorkbookFromSAP
+End Sub
+Sub ZIFI()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/usr/txt$ZEJER3").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/txt$ZPERDES").text = periodFrom
+    Session.FindById("wnd[0]/usr/txt$ZPERHAS").text = periodTo
+    Session.FindById("wnd[0]/usr/ctxt_ZBUKRSS-LOW").text = society
+    Session.FindById("wnd[0]").sendVKey 26
+    Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[1,0]").Selected = False
+    Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[2,0]").Selected = False
+    Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[3,0]").Selected = False
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 8
+    GetWorkbookFromSAP
+End Sub
+Sub ZL10()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/usr/txt$ZEJER3").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/txt$ZPERHAS").text = periodTo
+    Session.FindById("wnd[0]/usr/ctxt_SOCLEO1-LOW").text = society
+    Session.FindById("wnd[0]").sendVKey 26
+    Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[1,0]").Selected = False
+    Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[2,0]").Selected = False
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = ""
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]").sendVKey 21 'expandir seccion completamente
+    Session.FindById("wnd[0]").sendVKey 48
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0
+    GetWorkbookFromSAP
+End Sub
+Sub ZM37()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/usr/txt$ZEJER3").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/txt$ZPERDES").text = periodFrom
+    Session.FindById("wnd[0]/usr/txt$ZPERHAS").text = periodTo
+    Session.FindById("wnd[0]").sendVKey 7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 8
+    GetWorkbookFromSAP
+End Sub
+Sub ZM39()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/usr/txt$ZEJER3").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/txt$ZPERDES").text = periodFrom
+    Session.FindById("wnd[0]/usr/txt$ZPERHAS").text = periodTo
+    Session.FindById("wnd[0]").sendVKey 7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 8
+    GetWorkbookFromSAP
+End Sub
+Sub ZM42()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/usr/txt$ZYL0").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/txt$ZML0").text = periodFrom
+    Session.FindById("wnd[0]/usr/txt$ZMLF").text = periodTo
+    Session.FindById("wnd[0]").sendVKey 7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 8
+    GetWorkbookFromSAP
+End Sub
+Sub ZM43()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/usr/txt$ZEJER3").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/txt$ZPERHAS").text = periodTo
+    Session.FindById("wnd[0]").sendVKey 7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = ""
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]").sendVKey 21 'expandir seccion completamente
+    Session.FindById("wnd[0]").sendVKey 48
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/chkGRWOS_S_SCREEN_FIELDS-PROTECTION").Selected = True
+    Session.FindById("wnd[1]").sendVKey 0
+    GetWorkbookFromSAP
+End Sub
+Sub ZMX1()
+    Dim reportVersion As String
+    Dim dictionarySheet As Worksheet
+    Dim item() As Variant
+
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/usr/txt$ZEJER3").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/txt$ZPERDES").text = periodFrom
+    Session.FindById("wnd[0]/usr/txt$ZPERHAS").text = periodTo
+    Session.FindById("wnd[0]/usr/ctxt_ZBUKRSS-LOW").text = society
+    Session.FindById("wnd[0]").sendVKey 26
+    
+    Set dictionarySheet = ThisWorkbook.Worksheets("Diccionario Sociedades")
+    CreateFilterDictionary dictionarySheet
+    If Contains(society) Then
+        item = GetItem(society)
+        reportVersion = item(UBound(item))
+    End If
+    
+    If reportVersion = "V1" Then
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[0,0]").Selected = True
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[1,0]").Selected = False
+    Else
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[0,0]").Selected = False
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[1,0]").Selected = True
+    End If
+    
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 8
+    GetWorkbookFromSAP
+End Sub
+Sub ZMX2()
+    Dim reportVersion As String
+    Dim dictionarySheet As Worksheet
+    Dim item() As Variant
+    
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/usr/txt$ZYL0").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/ctxt$ZSOCIE1").text = society
+    Session.FindById("wnd[0]/usr/ctxt$ZSOCIE2").text = society
+    Session.FindById("wnd[0]/usr/txt$ZML0").text = periodFrom
+    Session.FindById("wnd[0]/usr/txt$ZMLF").text = periodTo
+    Session.FindById("wnd[0]").sendVKey 26
+    
+    Set dictionarySheet = ThisWorkbook.Worksheets("Diccionario Sociedades")
+    CreateFilterDictionary dictionarySheet
+    If Contains(society) Then
+        item = GetItem(society)
+        reportVersion = item(UBound(item))
+    End If
+    
+    If reportVersion = "V1" Then
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[0,0]").Selected = True
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[1,0]").Selected = False
+    Else
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[0,0]").Selected = False
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[1,0]").Selected = True
+    End If
+    
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 8
+    GetWorkbookFromSAP
+End Sub
+Sub ZIPL()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/usr/txt$ZYL0").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/ctxt$ZSOCIE1").text = society
+    Session.FindById("wnd[0]/usr/ctxt$ZSOCIE2").text = society
+    Session.FindById("wnd[0]/usr/txt$ZML0").text = periodFrom
+    Session.FindById("wnd[0]/usr/txt$ZMLF").text = periodTo
+    Session.FindById("wnd[0]").sendVKey 7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 8
+    GetWorkbookFromSAP
+End Sub
+Sub ZPYL()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/usr/txt$ZEJER3").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/ctxt$ZSOCIE1").text = society
+    Session.FindById("wnd[0]/usr/ctxt$ZSOCIE2").text = society
+    Session.FindById("wnd[0]/usr/txt$ZPERDES").text = periodFrom
+    Session.FindById("wnd[0]/usr/txt$ZPERHAS").text = periodTo
+    Session.FindById("wnd[0]").sendVKey 26
+    Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[1,0]").Selected = False
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = ""
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]").sendVKey 21
+    Session.FindById("wnd[0]").sendVKey 48
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0
+    GetWorkbookFromSAP
+End Sub
+Sub ZL43()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8
+    Session.FindById("wnd[0]/usr/txt$A1").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/txt$P1").text = periodTo
+    Session.FindById("wnd[0]/usr/ctxt_ZSOCIE3-LOW").text = society
+    Session.FindById("wnd[0]/usr/ctxt$ZSAKNR").text = accountNumber
+    Session.FindById("wnd[0]").sendVKey 7
+    If accountNumber = "ZGES" Then
+        Session.FindById("wnd[1]/usr/lbl[1,4]").SetFocus
+        Session.FindById("wnd[1]").sendVKey 0
+    End If
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0
+    Session.FindById("wnd[0]").sendVKey 26
+    Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[1,0]").Selected = False
+    Session.FindById("wnd[1]").sendVKey 0       ' Enter
+    Session.FindById("wnd[0]").sendVKey 8       ' F8
+    Session.FindById("wnd[0]").sendVKey 21
+    Session.FindById("wnd[0]").sendVKey 48
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0       ' Enter
+    Session.FindById("wnd[0]/tbar[0]/btn[3]").Press
+    Session.FindById("wnd[0]").sendVKey 8       ' F8
+    GetWorkbookFromSAP
+End Sub
+Sub ZL16()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8       ' F8
+    Session.FindById("wnd[0]/usr/txt$A2").text = ejer2
+    Session.FindById("wnd[0]/usr/txt$A3").text = ejer3
+    Session.FindById("wnd[0]/usr/txt$A4").text = ejer4
+    Session.FindById("wnd[0]/usr/txt$A1").text = ejer1
+    Session.FindById("wnd[0]/usr/ctxt$ZSOCIE1").text = society
+    Session.FindById("wnd[0]/usr/ctxt$ZSOCIE2").text = society
+    Session.FindById("wnd[0]/usr/txt$PE1ILE8").text = perIni1
+    Session.FindById("wnd[0]/usr/txt$PE2ILE8").text = perIni2
+    Session.FindById("wnd[0]/usr/txt$PE3ILE8").text = perIni3
+    Session.FindById("wnd[0]/usr/txt$PE4ILE8").text = perIni4
+    Session.FindById("wnd[0]/usr/txt$PE1FLE8").text = perFin1
+    Session.FindById("wnd[0]/usr/txt$PE2FLE8").text = perFin2
+    Session.FindById("wnd[0]/usr/txt$PE3FLE8").text = perFin3
+    Session.FindById("wnd[0]/usr/txt$PE4FLE8").text = perFin4
+    Session.FindById("wnd[0]").sendVKey 7       ' F7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0       ' Enter
+    Session.FindById("wnd[0]").sendVKey 8       ' F8
+    GetWorkbookFromSAP
+End Sub
+Sub ZMX6_año()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8       ' F8
+    Session.FindById("wnd[0]/usr/txt$ZYL0").text = CStr(CInt(fiscalYear1) - 1)
+    Session.FindById("wnd[0]/usr/ctxt$ZSOCIE1").text = society
+    Session.FindById("wnd[0]/usr/ctxt$ZSOCIE2").text = society
+    Session.FindById("wnd[0]").sendVKey 26      ' Ctrl + F2
+    If Trim(society) = "EXMX" Then
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[2,0]").Selected = False
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[3,0]").Selected = False
+        Session.FindById("wnd[1]/usr").VerticalScrollbar.position = 1
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[3,0]").Selected = False
+    Else
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[0,0]").Selected = False
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[1,0]").Selected = False
+        Session.FindById("wnd[1]/usr").VerticalScrollbar.position = 1
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[3,0]").Selected = False
+    End If
+    Session.FindById("wnd[1]").sendVKey 0       ' Enter
+    Session.FindById("wnd[0]").sendVKey 7       ' F7
+    Session.FindById("wnd[1]/usr/ctxtRGRWA-MASTERDATE").text = ""
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0       ' Enter
+    Session.FindById("wnd[0]").sendVKey 8       ' F8
+    Session.FindById("wnd[0]").sendVKey 21
+    Session.FindById("wnd[0]").sendVKey 3
+    
+    If ContainsGuiComponent("wnd[1]/usr/btnBUTTON_YES") Then
+        Session.FindById("wnd[1]/usr/btnBUTTON_YES").Press
+    End If
+    Session.FindById("wnd[0]").sendVKey 8       ' F8
+    Session.FindById("wnd[0]/shellcont/shell/shellcont[0]/shell").SelectedNode = "000002" 'seleccionando reporte
+    keepPreviousReport = "x"
+    takeSheetsFormat = "1"
+    GetWorkbookFromSAP
+End Sub
+Sub ZMX6()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = group
+    Session.FindById("wnd[0]").sendVKey 8       ' F8
+    Session.FindById("wnd[0]/usr/txt$ZYL0").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/ctxt$ZSOCIE1").text = society
+    Session.FindById("wnd[0]/usr/ctxt$ZSOCIE2").text = society
+    Session.FindById("wnd[0]").sendVKey 26      ' Ctrl + F2
+    If Trim(society) = "EXMX" Then
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[2,0]").Selected = False
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[3,0]").Selected = False
+        Session.FindById("wnd[1]/usr").VerticalScrollbar.position = 1
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[3,0]").Selected = False
+    Else
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[0,0]").Selected = False
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[1,0]").Selected = False
+        Session.FindById("wnd[1]/usr").VerticalScrollbar.position = 1
+        Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[3,0]").Selected = False
+    End If
+    Session.FindById("wnd[1]").sendVKey 0       ' Enter
+    Session.FindById("wnd[0]").sendVKey 7       ' F7
+    Session.FindById("wnd[1]/usr/ctxtRGRWA-MASTERDATE").text = ""
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0       ' Enter
+    Session.FindById("wnd[0]").sendVKey 8       ' F8
+    Session.FindById("wnd[0]").sendVKey 21
+    Session.FindById("wnd[0]").sendVKey 3       ' F3 ?
+    
+    If ContainsGuiComponent("wnd[1]/usr/btnBUTTON_YES") Then
+        Session.FindById("wnd[1]/usr/btnBUTTON_YES").Press
+    End If
+    Session.FindById("wnd[0]").sendVKey 8       ' F8
+    Session.FindById("wnd[0]/shellcont/shell/shellcont[0]/shell").SelectedNode = "000002" 'seleccionando reporte 1
+    takeSheetsFormat = "1"
+    GetWorkbookFromSAP
+    'Session.FindById("wnd[0]/shellcont/shell/shellcont[0]/shell").SelectedNode = "000001" 'seleccionando reporte 2
+    'keepPreviousReport = "x"
+    'takeSheetsFormat = "1"
+    'GetWorkbookFromSAP
+End Sub
+Sub ZM44()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = "ZM44"
+    Session.FindById("wnd[0]").sendVKey 8       ' F8
+    Session.FindById("wnd[0]/usr/txt$A3").text = fiscalYear2
+    Session.FindById("wnd[0]/usr/txt$A4").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/txt$PE3FLE8").text = periodFrom
+    Session.FindById("wnd[0]/usr/txt$PE4FLE8").text = periodTo
+    Session.FindById("wnd[0]/usr/ctxt_ZBUKRSS-LOW").text = society
+    Session.FindById("wnd[0]/usr/ctxt_ZLMONTR-LOW").text = ML
+    Session.FindById("wnd[0]").sendVKey 7       ' F7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0       ' Enter
+    Session.FindById("wnd[0]").sendVKey 8       ' F8
+    Session.FindById("wnd[0]").sendVKey 21      ' Shift + F9
+    GetWorkbookFromSAP
+End Sub
+Sub CUENTAS_PUENTE()
+    Session.FindById("wnd[0]/usr/ctxtRGRWJ-JOB").text = "ZIFI"
+    Session.FindById("wnd[0]").sendVKey 8       ' F8
+    Session.FindById("wnd[0]/usr/txt$ZEJER3").text = fiscalYear1
+    Session.FindById("wnd[0]/usr/txt$ZPERHAS").text = periodTo
+    Session.FindById("wnd[0]/usr/ctxt_ZBUKRSS-LOW").text = society
+    Session.FindById("wnd[0]").sendVKey 26      ' Ctrl + F2
+    Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[0,0]").Selected = False
+    Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[1,0]").Selected = False
+    Session.FindById("wnd[1]/usr/sub:SAPLGRWT:1040/chkT811I-ANZFLG[3,0]").Selected = False
+    Session.FindById("wnd[1]").sendVKey 0       ' Enter
+    Session.FindById("wnd[0]").sendVKey 7       ' F7
+    Session.FindById("wnd[1]/usr/subOI_DOC_TYPE:SAPLGRWOS:0210/cmbGRWOS_S_SCREEN_FIELDS-FILE_TYPE").key = "XLS"
+    Session.FindById("wnd[1]").sendVKey 0       ' Enter
+    Session.FindById("wnd[0]").sendVKey 8       ' F8
+    Session.FindById("wnd[0]").sendVKey 21
+    GetWorkbookFromSAP
+End Sub
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''OLEUtils''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'@Description inicia el desbloqueo de la ventana emergente de OLE
+'(desactiva el mensaje emergente: Microsoft Excel is waiting for another application to complete an OLE action)
+Sub START_DISABLE_POP_UP_FOR_OLE()
+    CoRegisterMessageFilter 0&, lMsgFilter
+End Sub
+
+'@Description finaliza el desbloqueo de la ventana emergente de OLE
+Sub END_DISABLE_POP_UP_FOR_OLE()
+    CoRegisterMessageFilter lMsgFilter, lMsgFilter
+End Sub
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''SAPGUIUtils'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+Private Function GetConnection() As GuiSession
+Retry:
+    On Error GoTo SapNotAwake
+    Set sapGuiAuto = GetObject("SAPGUI")
+    Set sapApplication = sapGuiAuto.GetScriptingEngine
+    Set sapConnection = sapApplication.Children(0)
+    Set Session = sapConnection.Children(0)
+    Set GetConnection = Session
+    On Error GoTo 0
+    GoTo JumpErrorHandler
+SapNotAwake:
+    On Error GoTo 0
+    Dim WshShell, proc
+    user = Application.InputBox("Por favor ingresar su nombre de usuario en el siguiente campo", _
+    "Inicio de sesion en SAP LOGON", "600XXXXX")
+    password = Application.InputBox("Por favor ingresar su contraseña en el siguiente campo (Este dato no es almacenado en ningun disco)", _
+    "Inicio de sesion en SAP LOGON", "XXXXXX")
+    Set WshShell = CreateObject("WScript.Shell")
+    Set proc = WshShell.Exec("C:\Program Files (x86)\SAP\FrontEnd\SAPgui\saplogon.exe")
+    WaitFindWindowHandlerByCaption "SAP Logon 770"
+    Set sapGuiAuto = GetObject("SAPGUI")
+    Set sapApplication = sapGuiAuto.GetScriptingEngine
+    Set sapConnection = sapApplication.OpenConnection("Tenaris - PROD", True)
+    Set Session = sapConnection.Children(0)
+    Session.FindById("wnd[0]/usr/txtRSYST-BNAME").text = user
+    Session.FindById("wnd[0]/usr/pwdRSYST-BCODE").text = password
+    Session.FindById("wnd[0]/usr/txtRSYST-LANGU").text = "ES"
+    Session.FindById("wnd[0]").sendVKey 0
+    GoTo Retry
+JumpErrorHandler:
+End Function
+Private Function GetSessionsCount() As Integer
+    GetSessionsCount = sapConnection.Sessions.Count
+End Function
+Private Function WaitNewSession(ByVal sessionsCountBeforeModoNew As Integer) As GuiSession
+    Do While sessionsCountBeforeModoNew = GetSessionsCount()
+        'Wait...
+    Loop
+    Set WaitNewSession = GetLastSession
+End Function
+Private Function OpenNewModo() As GuiSession
+    Dim sessionsCountBeforeModoNew As Integer
+    sessionsCountBeforeModoNew = GetSessionsCount()
+    Session.SendCommand "/on"
+    Set Session = WaitNewSession(sessionsCountBeforeModoNew)
+    Set OpenNewModo = Session
+End Function
+Private Function CloseCurrentModo()
+    Session.SendCommand "/i"
+End Function
+Private Function GetCurrentSession() As GuiSession
+    Set GetSession = Session
+End Function
+Private Function GetLastSession() As GuiSession
+    Set GetLastSession = sapConnection.Children(GetSessionsCount() - 1)
+End Function
+Private Function OpenTransaction(ByVal transactionCode As String)
+    Session.SendCommand transactionCode
+End Function
+Private Function OpenTransactionInNewModo(ByVal transactionCode As String) As GuiSession
+    Dim sessionsCountBeforeModoNew As Integer
+    Set Session = OpenNewModo()
+    sessionsCountBeforeModoNew = GetSessionsCount()
+    Session.SendCommand transactionCode
+    Set OpenTransactionInNewModo = Session
+End Function
+Private Function ContainsGuiComponent(ByVal id As String) As Boolean
+    If Not Session.FindById(id, False) Is Nothing Then
+        ContainsGuiComponent = True
+    Else
+        ContainsGuiComponent = False
+    End If
+End Function
+Private Function GetActiveWindowHandle() As Long
+    Dim sessionActiveWindow As GuiFrameWindow
+    Set sessionActiveWindow = Session.ActiveWindow
+    GetActiveWindowHandle = sessionActiveWindow.Handle
+End Function
+Private Function GetActiveWindowClose()
+    Dim sessionActiveWindow As GuiFrameWindow
+    Set sessionActiveWindow = Session.ActiveWindow
+End Function
+'''''''''''''''''''''''''''''''''''''''''''''''''''''ReportDownload'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+Sub Download()
+    Dim sourceSheets As Collection
+    Dim targetSheets As Worksheets
+    Dim sourceSheet, targetSheet As Worksheet
+    Dim targetReportRange, targetPastedRange, sourceRegion As Range
+    Dim row, column, maxRowOutlineLevel As Long
+    Dim sourceStartRow, sourceEndRow, sourceRows, sourceColumns As Long
+    Dim containsTargetSheet As Boolean
+    
+    Set sourceSheets = GetSourceSheetsByTakeSheetsFormat()
+    
+    containsTargetSheet = ContaintsSheet(targetWorkbook, targetReport)
+    If containsTargetSheet Then
+        Set targetSheet = targetWorkbook.Worksheets(targetReport)
+    Else
+        'agregando nueva hoja al final
+        Set targetSheet = targetWorkbook.Worksheets.Add(After:=targetWorkbook.Worksheets(targetWorkbook.Worksheets.Count))
+        targetSheet.Name = targetReport
+    End If
+    
+    'exista o no exista la hoja, el reporte siempre se pega en la misma posición inicial
+    row = 2
+    column = 2
+    
+    Set sourceSheet = sourceSheets.item(1)
+    CopyOutlineFrom sourceSheet, targetSheet 'estableciendo la direccion del esquema de agrupación
+    
+    If keepPreviousReport = "" Then
+        Set targetReportRange = GetTargetReportRange(sourceSheet, targetSheet)
+        targetReportRange.Clear
+        targetSheet.UsedRange.Cells.Borders.ColorIndex = xlColorIndexNone
+        ClearOutline targetSheet 'limpiando el esquema de agrupación
+    'si contiene la hoja del reporte, significa que existe un reporte previo y este debe conservarse
+    ElseIf containsTargetSheet And keepPreviousReport = "x" Then
+        Set targetReportRange = GetTargetReportRange(sourceSheet, targetSheet)
+        column = targetReportRange.Columns(targetReportRange.Columns.Count).column
+        column = column + 5 'dejando columnas en blanco para pegar el nuevo reporte
+    End If
+    
+    LogDateTime targetSheet, row - 1, column 'registro de fecha y horas, indica cuando se bajó el reporte
+    
+    'bajando varias hojas del reporte a la pestaña correspondiente
+    For Each sourceSheet In sourceSheets
+        Set targetPastedRange = targetSheet.Cells(row, column)
+        sourceRows = UBound(sourceSheet.UsedRange.Value, 1) - 1 'se resta -1 debido a que los datos se pegan a partir de la fila 2, columna 2
+        sourceColumns = UBound(sourceSheet.UsedRange.Value, 2) - 1
+        CopyUsedRangeValuesArrayFrom sourceSheet, targetSheet, targetPastedRange
+        Set targetPastedRange = targetSheet.Range(targetSheet.Cells(row, column), targetSheet.Cells(row + sourceRows, column + sourceColumns))
+        
+'        targetSheet.UsedRange.Cells.Interior.ColorIndex = xlColorIndexNone
+        targetSheet.Range(targetSheet.Cells(row, column), targetSheet.Cells(row, column + sourceColumns)).Interior.Color = RGB(0, 32, 96) 'estableciendo color cabecera reporte
+        targetSheet.Range(targetSheet.Cells(row, column), targetSheet.Cells(row, column + sourceColumns)).Font.Color = RGB(255, 255, 255) 'estableciendo color texto cabecera reporte
+        
+        Set sourceRegion = sourceSheet.UsedRange
+        sourceStartRow = sourceRegion.Rows(1).row
+        sourceEndRow = sourceRegion.Rows(sourceRegion.Rows.Count).row
+        CopyGroupingLevelsFrom sourceSheet, targetSheet, row
+        
+        row = row + sourceSheet.UsedRange.Rows.Count + 4
+        
+        With targetPastedRange
+            .Borders.LineStyle = xlContinuous
+            .Borders.ColorIndex = 0
+            .Borders.TintAndShade = 0
+            .Borders.Weight = xlThin
+        End With
+    Next
+    
+    targetSheet.UsedRange.Style = "Comma"
+    AutoFitColumns targetSheet
+    maxRowOutlineLevel = GetMaxRowOutlineLevel(targetSheet)
+    ShowRowOutlineLevel targetSheet, maxRowOutlineLevel, 1
+    RepaintSheet targetSheet
+End Sub
+
+Sub RepaintSheet(ByVal sheet As Worksheet)
+    sheet.Select
+    sheet.Range("A1").Select
+    ActiveWindow.SmallScroll Down:=1
+    ActiveWindow.SmallScroll Up:=1
+    ActiveWindow.SmallScroll ToRight:=1
+    ActiveWindow.SmallScroll ToLeft:=1
+End Sub
+
+'obtiene hojas especificadas de acuerdo al formato, y las almacena en un objeto Collection
+Function GetSourceSheetsByTakeSheetsFormat() As Collection
+    Dim sheetsToDownload() As String
+    Dim sourceSheets As New Collection
+    Dim i As Integer
+    'obtiene todas las hojas del reporte almacenandolas en un objeto Collection
+    If takeSheetsFormat = "" Then
+        For i = 1 To sourceWorkbook.Worksheets.Count
+            sourceSheets.Add sourceWorkbook.Worksheets(i)
+        Next
+        Set GetSourceSheetsByTakeSheetsFormat = sourceSheets
+    Else 'obtiene solo las hojas indicadas en takeSheetsFormat
+        sheetsToDownload = Split(takeSheetsFormat, ",")
+        For i = LBound(sheetsToDownload) To UBound(sheetsToDownload)
+            sourceSheets.Add sourceWorkbook.Worksheets(CInt(sheetsToDownload(i)))
+        Next
+        Set GetSourceSheetsByTakeSheetsFormat = sourceSheets
+    End If
+End Function
+
+'obtiene el rango del reporte X dentro de la hoja objetivo donde se pegara el nuevo,
+'esto permite borrar el reporte antiguo y pegar el nuevo
+Function GetTargetReportRange(ByVal sourceSheet As Worksheet, ByVal targetSheet As Worksheet) As Range
+    Dim startRow, startColumn, endRow, endColumn As Long
+    
+    With targetSheet
+        startRow = .UsedRange.Rows(1).row
+        startColumn = .UsedRange.Columns(1).column
+        endRow = .UsedRange.Rows(.UsedRange.Rows.Count).row
+        endColumn = .UsedRange.Columns(.UsedRange.Columns.Count).column
+    End With
+    
+    Set GetTargetReportRange = targetSheet.Range(targetSheet.Cells(startRow, startColumn), targetSheet.Cells(endRow, endColumn))
+End Function
+
+Sub LogDateTime(targetSheet As Worksheet, ByVal row As Long, ByVal column As Long)
+    targetSheet.Cells(row, column).Value = "Log Date: " & Now()
+End Sub
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''DictionaryUtils''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'@Description crea un objeto Dictionary a partir de la hoja que representa el diccionario
+'para clasificar informacion, la primera columna de la hoja de excel representa el valor clave (key)
+'key sirve para buscar la informacion de manera eficiente dentro del objeto Dictionary.
+'El valor (value o item) del objeto Dictionary sera una fila de la hoja excel que representa el diccionario, dicho
+'valor o item o fila se representa mediante un arreglo de una dimension
+'@Param dictionarySheet hoja de excel que representa el diccionario ocupado para clasificar informacion
+Sub CreateFilterDictionary(ByVal dictionarySheet As Worksheet)
+    dictionary.RemoveAll
+
+    Dim row, column, startRow, endRow, startColumn, endColumn, itemSize, j As Integer
+    Dim key As String
+    Dim matrix() As Variant
+    
+    matrix = dictionarySheet.UsedRange.Value
+    startRow = LBound(matrix, 1)
+    endRow = UBound(matrix, 1)
+    startColumn = LBound(matrix, 2)
+    endColumn = UBound(matrix, 2)
+    itemSize = endColumn
+    
+    For row = startRow To endRow
+        Dim item() As Variant
+        ReDim item(itemSize)
+        For column = startColumn To endColumn
+            item(column) = Trim(matrix(row, column))
+        Next
+        key = UCase(Trim(matrix(row, startColumn)))
+        Add key, item
+    Next
+End Sub
+
+'@Description agrega un elemento al objeto Dictionary
+'@Param key valor con el cual se indentificara el elemento a agregar
+'@Param item valor del elemento a agregar
+Sub Add(ByVal key As Variant, ByVal item As Variant)
+    dictionary.Add key, item
+End Sub
+
+'@Description verifica la existencia de un elemento (valor) dentro del objeto Dictionary de acuerdo a la clave con
+'el cual fue indentificado.
+'@Param key valor clave con el cual se identifica el elemento (valor) agregado
+'@Return True si el elemento existe, False de lo contrario
+Function Contains(ByVal key As Variant) As Boolean
+    Contains = dictionary.Exists(key)
+End Function
+
+'@Description obtiene un elemento (valor) dentro del objeto Dictionary de acuerdo a la clave con el cual fue identificado
+'@Param key valor clave con el cual se identifica el elemento agregado
+'@Return valor Variant que representa el elemento dentro del objeto Dictionary
+Function GetItem(ByVal key As Variant) As Variant
+    GetItem = dictionary.item(key)
+End Function
+
+'@Description obtiene todos los elementos (valores) contenidos dentro del objeto Dictionary
+'@Return valor Variant que representa todos los elementos dentro del objeto Dictionary
+Function GetItems() As Variant()
+    GetItems = dictionary.Items
+End Function
+
+'@Description obtiene todos las claves (keys) contenidas dentro del objeto Dictionary
+'@Return valor Variant que representa todas las claves dentro del objeto Dictionary
+Function GetKeys() As Variant()
+    GetKeys = dictionary.Keys
+End Function
+
+'@Description elimina un elemento dentro del objeto Dictionary de acuerdo a la clave con el cual se indentifica
+'@Param key valor clave con el cual se identifica el elemento agregado
+Sub Remove(ByVal key As Variant)
+    dictionary.Remove key
+End Sub
+
+'@Description elimina todos los elementos contenidos dentro del objeto Dictionary
+Sub RemoveAll()
+    dictionary.RemoveAll
+End Sub
+
+'@Description obtiene el numero de elementos que contiene el objeto Dictionary
+'@Return valor Integer que representa el numero de elementos que almacena el objeto Dictionary
+Function GetSize() As Integer
+    GetSize = dictionary.Count
+End Function
+'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''SheetUtils'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'@Overview SheetUtils proporciona funciones que facilitan copiar informacion de una hoja fuente a una hoja objetivo,
+'verificar la existencia de hojas dentro de un Workbook, copiar esquemas de agrupacion, y mas.
+'@Description copia los niveles de agrupacion de una hoja fuente a la hoja objetivo
+'@Param sourceSheet hoja de la cual se copiaran los niveles de agrupacion
+'@Param targetSheet hoja en la cual se copiaran los niveles de agrupacion
+'@Param sourceStartRow fila inicial de hoja fuente a partir de la cual se copiaran los niveles
+'@Param sourceEndRow fila final de la hoja fuente hasta donde se copiaran los niveles
+'@Param targetStartRow fila inicial de hoja objetivo a partir de la cual se comenzaran a establecer los niveles copiados
+Sub CopyGroupingLevelsFrom( _
+    ByVal sourceSheet As Worksheet, _
+    ByVal targetSheet As Worksheet, _
+    ByVal targetStartRow As Long _
+)
+    Dim row As Range
+    For Each row In sourceSheet.UsedRange.Rows
+        targetSheet.Rows(targetStartRow).OutlineLevel = row.OutlineLevel
+        targetStartRow = targetStartRow + 1
+    Next
+End Sub
+
+'@Description obtiene el nivel de agrupacion mas alto existente de una fila
+'@Param sheet hoja de la cual se obtendra el nivel de agrupacion
+'@Return valor Integer que representa el nivel de agrupacion mas alto
+Function GetMaxRowOutlineLevel(ByVal sheet As Worksheet) As Long
+    Dim row As Range
+    Dim maxOutlineLevel As Long
+    For Each row In sheet.UsedRange.Rows
+        If maxOutlineLevel < row.OutlineLevel Then
+            maxOutlineLevel = row.OutlineLevel
+        End If
+    Next
+    GetMaxRowOutlineLevel = maxOutlineLevel
+End Function
+
+'@Description obtiene el nivel de agrupacion mas alto existente de una columna
+'@Param sheet hoja de la cual se obtendra el nivel de agrupacion
+'@Return valor Integer que representa el nivel de agrupacion mas alto
+Function GetMaxColumnOutlineLevel(ByVal sheet As Worksheet) As Long
+    Dim column As Range
+    Dim maxOutlineLevel As Long
+    For Each column In sheet.UsedRange.Columns
+        If maxOutlineLevel < column.OutlineLevel Then
+            maxOutlineLevel = column.OutlineLevel
+        End If
+    Next
+    GetMaxColumnOutlineLevel = maxOutlineLevel
+End Function
+
+'@Description solo visualiza las filas del nivel establecido, los demas niveles de las filas son contraidos
+'@Param sheet hoja en la cual se mostraran las filas del nivel de agrupacion indicado
+'@Param maxOutlineLevel el nivel de grupacion mas alto existente en una fila
+'@Param levels nivel hasta el cual se visualizaran las filas
+Sub ShowRowOutlineLevel(ByVal sheet As Worksheet, ByVal maxOutlineLevel As Long, ByVal levels As Long)
+    Do While maxOutlineLevel >= levels
+        sheet.Outline.ShowLevels RowLevels:=maxOutlineLevel
+        maxOutlineLevel = maxOutlineLevel - 1
+    Loop
+End Sub
+
+'@Description solo visualiza las columnas del nivel establecido, los demas niveles de las columnas son contraidos
+'@Param sheet hoja en la cual se mostraran las columnas del nivel de agrupacion indicado
+'@Param maxOutlineLevel el nivel de grupacion mas alto existente en una columna
+'@Param levels nivel hasta el cual se visualizaran las columnas
+Sub ShowColumnOutlineLevel(ByVal sheet As Worksheet, ByVal maxOutlineLevel As Long, ByVal levels As Long)
+    Do While maxOutlineLevel >= levels
+        sheet.Outline.ShowLevels ColumnLevels:=maxOutlineLevel
+        maxOutlineLevel = maxOutlineLevel - 1
+    Loop
+End Sub
+
+'@Description limpia o elimina el esquema de agrupacion establecido
+'@Param sheet hoja en la cual se eliminara el esquema de agrupacion
+Sub ClearOutline(ByVal sheet As Worksheet)
+    sheet.Cells.ClearOutline
+End Sub
+
+'@Description copia la direccion del esquema de agrupacion desde una hoja fuente a una hoja objetivo
+'@Param sourceSheet hoja fuente desde la cual se copiara la direccion del esquema de agrupacion
+'@Param targetSheet hoja objetivo en la cual se establecera la direccion del esquema de agrupacion copiado
+Sub CopyOutlineFrom(ByVal sourceSheet As Worksheet, ByVal targetSheet As Worksheet)
+    targetSheet.Outline.SummaryRow = sourceSheet.Outline.SummaryRow
+    targetSheet.Outline.SummaryColumn = sourceSheet.Outline.SummaryColumn
+End Sub
+
+'@Description copia la informacion del rango usado desde la hoja fuente al rango indicado de la hoja objetivo
+'@Param sourceSheet hoja desde la cual se copiara la informacion del rango usado
+'@Param targetRange rango de la hoja objetivo donde se pegara la informacion copiada
+Sub CopyByUsedRangeFrom(ByVal sourceSheet As Worksheet, ByVal targetRange As Range)
+    sourceSheet.UsedRange.Copy targetRange
+End Sub
+
+'@Description copia los valores del rango usado de la hoja fuete a traves del array de valores del rango usado,
+'este tipo de copiado es util para no hacer uso del portapapeles al copiar la informacion.
+'@Param sourceSheet hoja desde la cual se copiara la informacion del rango usado
+'@Param targetRange rango de la hoja objetivo donde se pegara la informacion copiada
+Sub CopyUsedRangeValuesArrayFrom(ByVal sourceSheet As Worksheet, ByVal targetSheet As Worksheet, ByVal targetRange As Range)
+    Dim auxNumberFormat As Variant
+    auxNumberFormat = targetSheet.Cells.NumberFormat 'creando copia del formato de celdas original
+    targetSheet.Cells.NumberFormat = "@" 'estableciendo formato de texto, para evitar convertir datos
+    targetRange.Resize(UBound(sourceSheet.UsedRange.Value, 1), UBound(sourceSheet.UsedRange.Value, 2)).Value = sourceSheet.UsedRange.Value
+    targetSheet.Cells.NumberFormat = auxNumberFormat 'restaurando el formato de celdas original
+End Sub
+
+'@Description auto-ajusta el tamaño de las columnas de acuerdo al texto contenido dentro
+'@Param sheet hoja en la cual se ajustara el tamaño de las columnas automaticamente
+Sub AutoFitColumns(ByVal sheet As Worksheet)
+    sheet.UsedRange.Columns.AutoFit
+End Sub
+
+'@Description verifica la existencia de una hoja dentro del Workbook o documento excel
+'@Param targetWorkbook documento excel o Workbook donde se comprobara la existencia de la hoja indicada
+'@Param sheetName nombre de la hoja a comprobar existencia
+'@Return True si la hoja existe, False de lo contrario
+Function ContaintsSheet(ByVal targetWorkbook As Workbook, ByVal sheetName As String) As Boolean
+On Error GoTo ErrorHandler
+    If LCase(targetWorkbook.Worksheets(sheetName).Name) = LCase(sheetName) Then
+        ContaintsSheet = True
+    End If
+    Exit Function
+ErrorHandler:
+    ContaintsSheet = False
+End Function
+
+'@Description cambia la fuente de datos de la tabla dinamica y actualiza o refresca la tabla para mostrar la informacion nueva.
+'@Param targetWorkbook libro objetivo en el cual se creara un nuevo cache con la nueva informacion (fuente de datos)
+'@Param targetSheet hoja de la cual se recuperan las tablas dinamicas
+'@Param pivotTableName nombre de la tabla dinamica que se desea recuperar
+'@Param sourceData fuente de datos que se usara para cambiar y alimentar los datos de la tabla dinamica (dentro del rango es importante incluir las columnas que identifican cada dato de la fila)
+Sub ChangePivotTableSourceData(ByVal targetWorkbook As Workbook, ByVal targetSheet As Worksheet, ByVal pivotTableName As String, ByVal sourceData As Range)
+    Dim targetPivotTable As PivotTable
+    Dim newPivotCache As PivotCache
+    
+    Set targetPivotTable = targetSheet.PivotTables(pivotTableName)
+    Set newPivotCache = targetWorkbook.PivotCaches.Create(xlDatabase, sourceData:=sourceData)
+    targetPivotTable.ChangePivotCache newPivotCache
+    targetPivotTable.PivotCache.Refresh 'actualizando el cache o fuente de datos de la tabla recuperada
+    targetPivotTable.Update 'actualizando solo la tabla recuperada
+End Sub
+
+Private Function findAndCloseSAPWindow()
+    Dim sapGUIWindow As LongPtr
+    sapGUIWindow = FindWindow2(vbNullString, "SAP Logon 770")
+    SendMessage2 sapGUIWindow, WM_CLOSE, 0, 0
+End Function
+#If VBA7 Then
+    Private Function FindWindowHandlerByCaption(ByVal pattern_ As String) As LongPtr
+#Else
+    Private Function FindWindowHandlerByCaption(ByVal pattern_ As String) As Long
+#End If
+    Set regex = CreateObject("VBScript.RegExp")
+    regex.Pattern = pattern_
+    regex.IgnoreCase = True
+    EnumWindows AddressOf FindWindowHandlerByCaptionCallback, &H0
+    FindWindowHandlerByCaption = hWndChild
+End Function
+#If VBA7 Then
+    Private Function WaitFindWindowHandlerByCaption(ByVal pattern_ As String) As LongPtr
+#Else
+    Private Function WaitFindWindowHandlerByCaption(ByVal pattern_ As String) As Long
+#End If
+    hWnd = 0
+    Do While hWnd = 0
+        Application.Wait (Now + TimeValue("0:00:25")) 'un segundo
+        hWnd = FindWindowHandlerByCaption(pattern_)
+    Loop
+    WaitFindWindowHandlerByCaption = hWnd
+End Function
+#If VBA7 Then
+    Private Function FindWindowHandlerByCaptionCallback(ByVal hWnd As LongPtr, ByVal lParam As Long) As Long
+#Else
+    Private Function FindWindowHandlerByCaptionCallback(ByVal hWnd As Long, ByVal lParam As Long) As Long
+#End If
+    Dim caption As String
+    If IsWindowVisible(hWnd) Then
+        caption = GetHandlerText(hWnd)
+        If caption <> vbNullString Then 'si tiene titulo la ventana o existe texto
+            If regex.Test(caption) Then
+                hWndChild = hWnd
+                Exit Function
+            End If
+        End If
+    End If
+    hWndChild = 0 'no se encontro nada, devuelve 0
+    FindWindowHandlerByCaptionCallback = 1
+End Function
+#If VBA7 Then
+    Private Function FindWindowComponentHandlerByPosition(ByVal hWnd As LongPtr, ByVal position_ As Long, Optional ByVal lpClassName_ As String = vbNullString) As LongPtr
+#Else
+    Private Function FindWindowComponentHandlerByPosition(ByVal hWnd As Long, ByVal position_ As Long, Optional ByVal lpClassName_ As String = vbNullString) As Long
+#End If
+    position = position_
+    lpClassName = lpClassName_
+    i = 0
+    EnumChildWindows hWnd, AddressOf FindWindowComponentHandlerByPositionCallback, &H0
+    FindWindowComponentHandlerByPosition = hWndChild
+End Function
+#If VBA7 Then
+    Private Function FindWindowComponentHandlerByPositionCallback(ByVal hWnd As LongPtr, ByVal lParam As LongPtr) As LongPtr
+#Else
+    Private Function FindWindowComponentHandlerByPositionCallback(ByVal hWnd As Long, ByVal lParam As Long) As Long
+#End If
+    Dim className As String
+    className = GetHandlerClassName(hWnd)
+    Select Case lpClassName
+        Case className
+            If i = position Then
+                hWndChild = hWnd
+                Exit Function
+            End If
+            i = i + 1
+        Case vbNullString
+            If i = position Then
+                hWndChild = hWnd
+                Exit Function
+            End If
+            i = i + 1
+    End Select
+    hWndChild = 0 'no se encontro nada, devuelve 0
+    FindWindowComponentHandlerByPositionCallback = 1
+End Function
+#If VBA7 Then
+    Private Function GetHandlerClassName(ByVal hWnd As LongPtr) As String
+#Else
+    Private Function GetHandlerClassName(ByVal hWnd As Long) As String
+#End If
+    Dim className As String
+    Dim sanitizedClassName As String
+    className = Space$(256)
+    If GetClassName(hWnd, className, Len(className)) <> 0 Then
+        'se elimina caracter adicional y solo se deja el nombre de la clase
+        sanitizedClassName = Left$(className, InStr(className, vbNullChar) - 1)
+        GetHandlerClassName = sanitizedClassName
+    Else
+        GetHandlerClassName = vbNullString
+    End If
+End Function
+#If VBA7 Then
+    Private Function SendClickToWindowComponent(ByVal hWndChild As LongPtr)
+#Else
+    Private Function SendClickToWindowComponent(ByVal hWndChild As Long)
+#End If
+    SendMessage hWndChild, BM_CLICK, CLng(0), CLng(0)
+End Function
+#If VBA7 Then
+    Private Function GetHandlerText(ByVal hWnd As LongPtr) As String
+#Else
+    Private Function GetHandlerText(ByVal hWnd As Long) As String
+#End If
+    Dim caption As String
+    Dim sanitizedCaption As String
+    caption = Space$(256)
+    If GetWindowText(hWnd, caption, Len(caption)) <> 0 Then
+        sanitizedCaption = Left$(caption, InStr(caption, vbNullChar) - 1) 'se elimina caracter adicional y solo se deja el caption
+        GetHandlerText = sanitizedCaption
+    Else
+        GetHandlerText = vbNullString
+    End If
+End Function
+#If VBA7 Then
+    Private Function SendKeyToWindow(ByVal hWnd As LongPtr, ByVal keyCodeConstant As Long) As Boolean
+#Else
+    Private Function SendKeyToWindow(ByVal hWnd As Long, ByVal keyCodeConstant As Long) As Boolean
+#End If
+    SendKeyToWindow = PostMessage(hWnd, WM_KEYDOWN, keyCodeConstant, CLng(0)) <> 0
+End Function
+#If VBA7 Then
+    Private Function SendTextToWindowComponent(ByVal hWndChild As LongPtr, ByVal text As String)
+#Else
+    Private Function SendTextToWindowComponent(ByVal hWndChild As Long, ByVal text As String)
+#End If
+    'se esperan 3 o X segundos necesearios, para que el componente se visualice y el texto enviado sea tomado
+    'adecuadamente (ejemplo: en la ventana de Guardar como, es util esperar 3 segundos para que el texto enviado
+    'al componente con nombre de clase Edit sea tomado correctamente al pulsar el boton Guardar mediante SendClickToWindowComponent)
+    Application.Wait (Now + TimeValue("0:00:3")) '3 segundos
+    SendMessage hWndChild, WM_SETTEXT, 0, text
+End Function
+'---------------------------------------------------------------------------------------------
+'---------------------------------------------------------------------------------------------
+'-----------------------------------HandlerWindowSaveAsUtils----------------------------------
+'------------------------------------------Functions------------------------------------------
+'---------------------------------------------------------------------------------------------
+'---------------------------------------------------------------------------------------------
+Private Function SetDocumentExtension(ByVal documentExtension_ As String)
+    documentExtension = documentExtension_
+End Function
+Private Function HandleWindow(Optional ByVal hWnd As Variant = -1, Optional ByVal patternCaption = "guardar como|save as")
+    Dim hWndSaveAs As Variant
+    pathfile = ruta & GetFileNameWithExtension
+    If hWnd <> -1 Then
+        SendKeyToWindow hWnd, vbKeyReturn
+    End If
+    hWndSaveAs = WaitFindWindowHandlerByCaption(patternCaption)
+    hWnd = FindWindowComponentHandlerByPosition(hWndSaveAs, 0, "Edit")
+    SendTextToWindowComponent hWnd, pathfile
+    hWnd = FindWindowComponentHandlerByPosition(hWndSaveAs, 1, "Button")
+    SendClickToWindowComponent hWnd
+    'WaitTransferringPackage
+End Function
+Private Function GetFileNameWithExtension() As String
+    GetFileNameWithExtension = NombreLibro & "." & GetDocumentExtension
+End Function
+Private Function GetDocumentExtension() As String
+    'asignando extension por default
+    If documentExtension = vbNullString Then
+        SetDocumentExtension "XLSX"
+    End If
+    GetDocumentExtension = documentExtension
+End Function
